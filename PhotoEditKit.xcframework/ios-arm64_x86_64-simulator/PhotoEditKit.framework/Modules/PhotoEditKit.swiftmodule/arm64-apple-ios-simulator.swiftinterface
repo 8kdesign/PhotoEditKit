@@ -1,0 +1,679 @@
+// swift-interface-format-version: 1.0
+// swift-compiler-version: Apple Swift version 6.4 effective-5.10 (swiftlang-6.4.0.34.1 clang-2100.3.34.1)
+// swift-module-flags: -target arm64-apple-ios17.6-simulator -enable-objc-interop -enable-library-evolution -language-mode 5 -O -enable-experimental-feature DebugDescriptionMacro -enable-bare-slash-regex -module-name PhotoEditKit
+// swift-module-flags-ignorable:  -formal-cxx-interoperability-mode=off -interface-compiler-version 6.4
+import AVFoundation
+import CoreImage.CIFilterBuiltins
+import Combine
+import CoreGraphics
+import CoreImage
+import CoreML
+import Foundation
+import ImageIO
+import Photos
+import Swift
+import SwiftUI
+import UIKit
+import UniformTypeIdentifiers
+import Vision
+import _Concurrency
+import _StringProcessing
+import _SwiftConcurrencyShims
+import simd
+@_hasMissingDesignatedInitializers final public class AIPostProcessingHelper {
+  public struct RawContext {
+    public let cameraReference: CoreGraphics::CGImage?
+    public let rawRecovery: PhotoEditKit::RawRecoveryLayers?
+    public init(cameraReference: CoreGraphics::CGImage?, rawRecovery: PhotoEditKit::RawRecoveryLayers?)
+  }
+  public static func suggestions(for image: UIKit::UIImage, raw: PhotoEditKit::AIPostProcessingHelper.PhotoEditKit::RawContext? = nil, metadata: [Swift::String : Any]? = nil) -> [PhotoEditKit::EditSuggestion]
+  public static func topSuggestion(for image: CoreGraphics::CGImage, metadata: [Swift::String : Any]? = nil) -> PhotoEditKit::EditConfig?
+  public static func classifyScene(_ image: CoreGraphics::CGImage) -> PhotoEditKit::AIScene?
+  @objc deinit
+}
+extension PhotoEditKit::PostProcessingHelper {
+  public static func renderedEdit(of source: CoreGraphics::CGImage, config: PhotoEditKit::EditConfig, rawRecovery: PhotoEditKit::RawRecoveryLayers?) -> CoreGraphics::CGImage?
+}
+public enum AIScene : Swift::String, Swift::CaseIterable {
+  case people, animals, food, object, indoor, city, sky, nature, light
+  public static func fromString(string: Swift::String) -> PhotoEditKit::AIScene?
+  public var title: Foundation::LocalizedStringResource {
+    get
+  }
+  public var icon: Swift::String {
+    get
+  }
+  public init?(rawValue: Swift::String)
+  public typealias AllCases = [PhotoEditKit::AIScene]
+  public typealias RawValue = Swift::String
+  nonisolated public static var allCases: [PhotoEditKit::AIScene] {
+    get
+  }
+  public var rawValue: Swift::String {
+    get
+  }
+}
+public class EditController : Foundation::ObservableObject {
+  public init()
+  @Combine::Published<PhotoEditKit::EditConfig> @_projectedValueProperty($currentConfig) public var currentConfig: PhotoEditKit::EditConfig {
+    get
+    @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
+    set
+  }
+  public var $currentConfig: Combine::Published<PhotoEditKit::EditConfig>.Combine::Publisher {
+    get
+    @available(macOS 11.0, iOS 14.0, tvOS 14.0, watchOS 7.0, *)
+    set
+  }
+  @Combine::Published<UIKit::UIImage?> @_projectedValueProperty($editedImage) public var editedImage: UIKit::UIImage? {
+    get
+    @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
+    set
+    @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
+    _modify
+  }
+  public var $editedImage: Combine::Published<UIKit::UIImage?>.Combine::Publisher {
+    get
+    @available(macOS 11.0, iOS 14.0, tvOS 14.0, watchOS 7.0, *)
+    set
+  }
+  @Combine::Published<UIKit::UIImage?> @_projectedValueProperty($prerotatedImage) public var prerotatedImage: UIKit::UIImage? {
+    get
+    @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
+    set
+    @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
+    _modify
+  }
+  public var $prerotatedImage: Combine::Published<UIKit::UIImage?>.Combine::Publisher {
+    get
+    @available(macOS 11.0, iOS 14.0, tvOS 14.0, watchOS 7.0, *)
+    set
+  }
+  @Combine::Published<Swift::Bool> @_projectedValueProperty($showOriginalImage) public var showOriginalImage: Swift::Bool {
+    get
+    @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
+    set
+    @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
+    _modify
+  }
+  public var $showOriginalImage: Combine::Published<Swift::Bool>.Combine::Publisher {
+    get
+    @available(macOS 11.0, iOS 14.0, tvOS 14.0, watchOS 7.0, *)
+    set
+  }
+  @Combine::Published<UIKit::UIImage?> @_projectedValueProperty($sourcePreviewImage) public var sourcePreviewImage: UIKit::UIImage? {
+    get
+    @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
+    set
+    @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
+    _modify
+  }
+  public var $sourcePreviewImage: Combine::Published<UIKit::UIImage?>.Combine::Publisher {
+    get
+    @available(macOS 11.0, iOS 14.0, tvOS 14.0, watchOS 7.0, *)
+    set
+  }
+  @Combine::Published<PhotoEditKit::EditSetting?> @_projectedValueProperty($selectedSetting) public var selectedSetting: PhotoEditKit::EditSetting? {
+    get
+    @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
+    set
+    @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
+    _modify
+  }
+  public var $selectedSetting: Combine::Published<PhotoEditKit::EditSetting?>.Combine::Publisher {
+    get
+    @available(macOS 11.0, iOS 14.0, tvOS 14.0, watchOS 7.0, *)
+    set
+  }
+  @Combine::Published<PhotoEditKit::EditAspectRatio> @_projectedValueProperty($aspectRatio) public var aspectRatio: PhotoEditKit::EditAspectRatio {
+    get
+    @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
+    set
+    @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
+    _modify
+  }
+  public var $aspectRatio: Combine::Published<PhotoEditKit::EditAspectRatio>.Combine::Publisher {
+    get
+    @available(macOS 11.0, iOS 14.0, tvOS 14.0, watchOS 7.0, *)
+    set
+  }
+  @Combine::Published<PhotoEditKit::EditRotation> @_projectedValueProperty($editRotation) public var editRotation: PhotoEditKit::EditRotation {
+    get
+    @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
+    set
+    @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
+    _modify
+  }
+  public var $editRotation: Combine::Published<PhotoEditKit::EditRotation>.Combine::Publisher {
+    get
+    @available(macOS 11.0, iOS 14.0, tvOS 14.0, watchOS 7.0, *)
+    set
+  }
+  @Combine::Published<PhotoEditKit::AIProcessingState> @_projectedValueProperty($aiProcessingState) public var aiProcessingState: PhotoEditKit::AIProcessingState {
+    get
+    @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
+    set
+    @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
+    _modify
+  }
+  public var $aiProcessingState: Combine::Published<PhotoEditKit::AIProcessingState>.Combine::Publisher {
+    get
+    @available(macOS 11.0, iOS 14.0, tvOS 14.0, watchOS 7.0, *)
+    set
+  }
+  @Combine::Published<Foundation::UUID?> @_projectedValueProperty($appliedSuggestionID) public var appliedSuggestionID: Foundation::UUID? {
+    get
+  }
+  public var $appliedSuggestionID: Combine::Published<Foundation::UUID?>.Combine::Publisher {
+    get
+  }
+  public var source: (any PhotoEditKit::EditSource)? {
+    get
+  }
+  public var hasDepth: Swift::Bool
+  public var action: PhotoEditKit::EditController.PhotoEditKit::Action?
+  public enum Action {
+    case swiping
+    case cropping
+    case zooming
+    public static func == (a: PhotoEditKit::EditController.PhotoEditKit::Action, b: PhotoEditKit::EditController.PhotoEditKit::Action) -> Swift::Bool
+    public func hash(into hasher: inout Swift::Hasher)
+    public var hashValue: Swift::Int {
+      get
+    }
+  }
+  public static var previewMaxDimension: CoreFoundation::CGFloat
+  @PhotoEditKit::LogicActor public func prepare(source: any PhotoEditKit::EditSource) async
+  public func destroy()
+  @PhotoEditKit::LogicActor public func renderForExport(config: PhotoEditKit::EditConfig, editRotation: PhotoEditKit::EditRotation) async -> (image: CoreGraphics::CGImage, gainMap: CoreImage::CIImage?)?
+  public func hasEdits() -> Swift::Bool
+  @_Concurrency::MainActor public func previewConfig(_ config: PhotoEditKit::EditConfig)
+  @_Concurrency::MainActor public func confirmPreviewConfig()
+  @_Concurrency::MainActor public func addConfig(_ config: PhotoEditKit::EditConfig, needClearRedo: Swift::Bool = true)
+  @_Concurrency::MainActor public func undoConfig()
+  public func canUndo() -> Swift::Bool
+  public var historyCount: Swift::Int {
+    get
+  }
+  @_Concurrency::MainActor public func redoConfig()
+  public func canRedo() -> Swift::Bool
+  @_Concurrency::MainActor public func processAI()
+  @_Concurrency::MainActor public func applySuggestion(_ suggestion: PhotoEditKit::EditSuggestion?)
+  public typealias ObjectWillChangePublisher = Combine::ObservableObjectPublisher
+  @objc deinit
+}
+extension PhotoEditKit::EditController {
+  @_Concurrency::MainActor public func updateAspectRatioCrop()
+}
+public protocol EditSource : AnyObject {
+  var isRaw: Swift::Bool { get }
+  @PhotoEditKit::LogicActor func loadOriginal() async -> PhotoEditKit::EditSourceImage?
+  @PhotoEditKit::LogicActor func loadRawExtras(developSize: CoreFoundation::CGSize, exposures: [Swift::Float], referenceMaxDimension: CoreFoundation::CGFloat) async -> PhotoEditKit::RawEditingExtras
+  func developRaw(targetSize: CoreFoundation::CGSize, exposures: [Swift::Float]) async -> [Swift::Float : CoreGraphics::CGImage]
+  @PhotoEditKit::LogicActor func loadDepth() async -> (data: AVFoundation::AVDepthData, orientation: Swift::Int32)?
+  @PhotoEditKit::LogicActor func defaultBlurRadius(depthData: AVFoundation::AVDepthData, imageSize: CoreFoundation::CGSize) async -> CoreFoundation::CGFloat
+  func loadMetadata() async -> [Swift::String : Any]?
+  func loadFileData() async -> (data: Foundation::Data, orientation: ImageIO::CGImagePropertyOrientation)?
+  @PhotoEditKit::LogicActor func loadPreview(maxDimension: CoreFoundation::CGFloat) async -> UIKit::UIImage?
+}
+extension PhotoEditKit::EditSource {
+  @PhotoEditKit::LogicActor public func loadPreview(maxDimension: CoreFoundation::CGFloat) async -> UIKit::UIImage?
+}
+public struct EditSourceImage {
+  public let image: UIKit::UIImage
+  public let isDevelopedRaw: Swift::Bool
+  public init(image: UIKit::UIImage, isDevelopedRaw: Swift::Bool)
+}
+public struct RawEditingExtras {
+  public let cameraReference: CoreGraphics::CGImage?
+  public let offsetDevelops: [Swift::Float : CoreGraphics::CGImage]
+  public init(cameraReference: CoreGraphics::CGImage?, offsetDevelops: [Swift::Float : CoreGraphics::CGImage])
+}
+public enum AIProcessingState {
+  case pending
+  case loading
+  case done(result: [PhotoEditKit::EditSuggestion])
+  case unavailable
+}
+public enum DragPosition : Swift::Equatable {
+  case topLeft
+  case topRight
+  case bottomLeft
+  case bottomRight
+  case inside(startRect: CoreFoundation::CGRect)
+  public func oppositeCorner() -> PhotoEditKit::DragPosition?
+  public static func == (a: PhotoEditKit::DragPosition, b: PhotoEditKit::DragPosition) -> Swift::Bool
+}
+public enum EditAspectRatio : Swift::CaseIterable, Swift::Identifiable {
+  case original
+  case free
+  case r_21_9
+  case r_18_9
+  case r_16_9
+  case r_4_3
+  case r_1_1
+  case r_3_4
+  case r_9_16
+  case r_9_18
+  case r_9_21
+  public var id: PhotoEditKit::EditAspectRatio {
+    get
+  }
+  public func toFloat() -> CoreFoundation::CGFloat
+  public func toString() -> Foundation::LocalizedStringResource
+  public func toId() -> Swift::Int
+  public static func fromId(id: Swift::Int) -> PhotoEditKit::EditAspectRatio?
+  public static func == (a: PhotoEditKit::EditAspectRatio, b: PhotoEditKit::EditAspectRatio) -> Swift::Bool
+  public typealias AllCases = [PhotoEditKit::EditAspectRatio]
+  public typealias ID = PhotoEditKit::EditAspectRatio
+  nonisolated public static var allCases: [PhotoEditKit::EditAspectRatio] {
+    get
+  }
+  public func hash(into hasher: inout Swift::Hasher)
+  public var hashValue: Swift::Int {
+    get
+  }
+}
+public let DEFAULT_CROP: CoreFoundation::CGRect
+public let SIDE_MIN_SIZE: CoreFoundation::CGFloat
+public let snappingPoints: [CoreFoundation::CGFloat]
+public class EditConfig : Swift::Equatable {
+  public var configType: PhotoEditKit::EditSettingType?
+  public var properties: [PhotoEditKit::EditSettingType : CoreFoundation::CGFloat]
+  public var crop: CoreFoundation::CGRect?
+  public var editRotation: PhotoEditKit::EditRotation
+  public init(rotation: CoreFoundation::CGFloat = 0, editRotation: PhotoEditKit::EditRotation = .original, crop: CoreFoundation::CGRect? = nil, exposure: CoreFoundation::CGFloat = 0, shadow: CoreFoundation::CGFloat = 0, highlight: CoreFoundation::CGFloat = 0, brightness: CoreFoundation::CGFloat = 0, contrast: CoreFoundation::CGFloat = 0, saturation: CoreFoundation::CGFloat = 0, temperature: CoreFoundation::CGFloat = 0, sharpness: CoreFoundation::CGFloat = 0, depth: CoreFoundation::CGFloat = 0)
+  public init(properties: [PhotoEditKit::EditSettingType : CoreFoundation::CGFloat], crop: CoreFoundation::CGRect? = nil, editRotation: PhotoEditKit::EditRotation = .original, actionType: PhotoEditKit::EditSettingType? = nil)
+  public static func == (lhs: PhotoEditKit::EditConfig, rhs: PhotoEditKit::EditConfig) -> Swift::Bool
+  public func getValue(setting: PhotoEditKit::EditSettingType) -> CoreFoundation::CGFloat
+  public func getPercentage(setting: PhotoEditKit::EditSetting) -> CoreFoundation::CGFloat
+  public func getRelativePercentage(setting: PhotoEditKit::EditSetting) -> CoreFoundation::CGFloat
+  public static func percentageToEditSetting(setting: PhotoEditKit::EditSetting, percentage: CoreFoundation::CGFloat) -> PhotoEditKit::EditConfig
+  @objc deinit
+}
+extension Swift::Array where Element == PhotoEditKit::EditConfig {
+  public func combine() -> PhotoEditKit::EditConfig
+}
+public enum EditRotation {
+  case original
+  case ninety
+  case oneEighty
+  case twoSeventy
+  case originalFlip
+  case ninetyFlip
+  case oneEightyFlip
+  case twoSeventyFlip
+  public func isFlipped() -> Swift::Bool
+  public func isNeedSizeChange() -> Swift::Bool
+  public func getDegree() -> CoreFoundation::CGFloat
+  public func rotateClockwise() -> PhotoEditKit::EditRotation
+  public func flip() -> PhotoEditKit::EditRotation
+  public func combine(_ value: PhotoEditKit::EditRotation) -> PhotoEditKit::EditRotation
+  public static func == (a: PhotoEditKit::EditRotation, b: PhotoEditKit::EditRotation) -> Swift::Bool
+  public func hash(into hasher: inout Swift::Hasher)
+  public var hashValue: Swift::Int {
+    get
+  }
+}
+public class EditSetting : Swift::Identifiable, Swift::Equatable {
+  public var id: Foundation::UUID
+  public var type: PhotoEditKit::EditSettingType
+  public var name: Foundation::LocalizedStringResource
+  public var systemIcon: Swift::String
+  public var minValue: CoreFoundation::CGFloat
+  public var maxValue: CoreFoundation::CGFloat
+  public var offset: CoreFoundation::CGFloat
+  public var tint: SwiftUICore::Color?
+  public var getEditConfig: (_ value: CoreFoundation::CGFloat) -> PhotoEditKit::EditConfig
+  public init(type: PhotoEditKit::EditSettingType, name: Foundation::LocalizedStringResource, systemIcon: Swift::String, minValue: CoreFoundation::CGFloat, maxValue: CoreFoundation::CGFloat, offset: CoreFoundation::CGFloat, tint: SwiftUICore::Color? = nil, getEditConfig: @escaping (CoreFoundation::CGFloat) -> PhotoEditKit::EditConfig)
+  public static func == (lhs: PhotoEditKit::EditSetting, rhs: PhotoEditKit::EditSetting) -> Swift::Bool
+  public typealias ID = Foundation::UUID
+  @objc deinit
+}
+public enum EditSettingType {
+  case depth
+  case rotation
+  case fullRotation
+  case crop
+  case aspectratio
+  case exposure
+  case shadow
+  case highlight
+  case brightness
+  case contrast
+  case saturation
+  case temperature
+  case shadowWarmth
+  case sharpness
+  case noiseReduction
+  case vignette
+  case boostRed
+  case boostYellow
+  case boostGreen
+  case boostCyan
+  case boostBlue
+  case boostMagenta
+  public func getSetting() -> PhotoEditKit::EditSetting
+  public func getColorBoostBand() -> PhotoEditKit::ColorBoostBand?
+  public static func == (a: PhotoEditKit::EditSettingType, b: PhotoEditKit::EditSettingType) -> Swift::Bool
+  public func hash(into hasher: inout Swift::Hasher)
+  public var hashValue: Swift::Int {
+    get
+  }
+}
+public let availableEditSettings: [PhotoEditKit::EditSettingType]
+public let colorBoostSettings: [PhotoEditKit::EditSettingType]
+public let rotationSettings: [PhotoEditKit::EditSettingType]
+public let bokehSettings: [PhotoEditKit::EditSettingType]
+public let ROTATION_MIN: CoreFoundation::CGFloat
+public let ROTATION_MAX: CoreFoundation::CGFloat
+public let EXPOSURE_MIN: CoreFoundation::CGFloat
+public let EXPOSURE_MAX: CoreFoundation::CGFloat
+public let SHADOW_MIN: CoreFoundation::CGFloat
+public let SHADOW_MAX: CoreFoundation::CGFloat
+public let HIGHLIGHTS_MIN: CoreFoundation::CGFloat
+public let HIGHLIGHTS_MAX: CoreFoundation::CGFloat
+public let BRIGHTNESS_MIN: CoreFoundation::CGFloat
+public let BRIGHTNESS_MAX: CoreFoundation::CGFloat
+public let CONTRAST_MIN: CoreFoundation::CGFloat
+public let CONTRAST_MAX: CoreFoundation::CGFloat
+public let SATURATION_MIN: CoreFoundation::CGFloat
+public let SATURATION_MAX: CoreFoundation::CGFloat
+public let TEMPERATURE_MIN: CoreFoundation::CGFloat
+public let TEMPERATURE_MAX: CoreFoundation::CGFloat
+public let SHADOW_WARMTH_MIN: CoreFoundation::CGFloat
+public let SHADOW_WARMTH_MAX: CoreFoundation::CGFloat
+public let SHARPNESS_MIN: CoreFoundation::CGFloat
+public let SHARPNESS_MAX: CoreFoundation::CGFloat
+public let NOISE_REDUCTION_MIN: CoreFoundation::CGFloat
+public let NOISE_REDUCTION_MAX: CoreFoundation::CGFloat
+public let VIGNETTE_MIN: CoreFoundation::CGFloat
+public let VIGNETTE_MAX: CoreFoundation::CGFloat
+public let COLOR_BOOST_MIN: CoreFoundation::CGFloat
+public let COLOR_BOOST_MAX: CoreFoundation::CGFloat
+public let DEPTH_MIN: CoreFoundation::CGFloat
+public let DEPTH_MAX: CoreFoundation::CGFloat
+public let depthEditSetting: PhotoEditKit::EditSetting
+public let rotationEditSetting: PhotoEditKit::EditSetting
+public let fullRotationEditSetting: PhotoEditKit::EditSetting
+public let cropEditSetting: PhotoEditKit::EditSetting
+public let exposureEditSetting: PhotoEditKit::EditSetting
+public let shadowEditSetting: PhotoEditKit::EditSetting
+public let highlightEditSetting: PhotoEditKit::EditSetting
+public let brightnessEditSetting: PhotoEditKit::EditSetting
+public let contrastEditSetting: PhotoEditKit::EditSetting
+public let saturationEditSetting: PhotoEditKit::EditSetting
+public let temperatureEditSetting: PhotoEditKit::EditSetting
+public let shadowWarmthEditSetting: PhotoEditKit::EditSetting
+public let sharpnessEditSetting: PhotoEditKit::EditSetting
+public let noiseReductionEditSetting: PhotoEditKit::EditSetting
+public let vignetteEditSetting: PhotoEditKit::EditSetting
+public let redBoostEditSetting: PhotoEditKit::EditSetting
+public let yellowBoostEditSetting: PhotoEditKit::EditSetting
+public let greenBoostEditSetting: PhotoEditKit::EditSetting
+public let cyanBoostEditSetting: PhotoEditKit::EditSetting
+public let blueBoostEditSetting: PhotoEditKit::EditSetting
+public let magentaBoostEditSetting: PhotoEditKit::EditSetting
+extension PhotoEditKit::ColorBoostBand {
+  public var setting: PhotoEditKit::EditSettingType {
+    get
+  }
+}
+public struct EditSuggestion : Swift::Identifiable, Swift::Equatable {
+  public let id: Foundation::UUID
+  public let title: Foundation::LocalizedStringResource
+  public let config: PhotoEditKit::EditConfig
+  public let thumbnail: UIKit::UIImage?
+  public init(title: Foundation::LocalizedStringResource, config: PhotoEditKit::EditConfig, thumbnail: UIKit::UIImage? = nil)
+  public static func == (lhs: PhotoEditKit::EditSuggestion, rhs: PhotoEditKit::EditSuggestion) -> Swift::Bool
+  public typealias ID = Foundation::UUID
+}
+public let NOISE_REDUCTION_GRAIN_FALLOFF: Swift::Double
+public struct TemperatureGain {
+  public let red: Swift::Double
+  public let green: Swift::Double
+  public let blue: Swift::Double
+  public init(_ value: Swift::Double)
+  public var isNeutral: Swift::Bool {
+    get
+  }
+  public static func neutralizing(redToBlue ratio: Swift::Double) -> Swift::Double
+}
+extension CoreImage::CIImage {
+  public func setExposure(_ value: Swift::Double) -> CoreImage::CIImage?
+  public func setShadowAndHighlights(shadow: Swift::Double, highlight: Swift::Double) -> CoreImage::CIImage?
+  public func setBrightness(_ value: Swift::Double) -> CoreImage::CIImage?
+  public func setContrast(_ value: Swift::Double) -> CoreImage::CIImage?
+  public func setSaturation(_ value: Swift::Double) -> CoreImage::CIImage?
+  public func setColorControls(brightness: Swift::Double, contrast: Swift::Double, saturation: Swift::Double) -> CoreImage::CIImage?
+  public func setColorBoost(color: SwiftUICore::Color) -> CoreImage::CIImage?
+  public func applyingEditConfig(_ config: PhotoEditKit::EditConfig, renderScale: CoreFoundation::CGFloat = 1, rawRecovery: PhotoEditKit::RawRecoveryLayers? = nil, includeVignette: Swift::Bool = true) -> CoreImage::CIImage
+  public func setVignette(_ value: Swift::Double) -> CoreImage::CIImage?
+  public func setColorBoosts(_ amounts: [PhotoEditKit::ColorBoostBand : Swift::Float]) -> CoreImage::CIImage?
+  public func setTemperatureFilter(_ value: Swift::Double) -> CoreImage::CIImage?
+  public func setShadowWarmth(_ value: Swift::Double) -> CoreImage::CIImage?
+  public func setSepiaColorFilter(_ value: Swift::Float) -> CoreImage::CIImage?
+  public func setNoiseReduction(_ value: Swift::Double, renderScale: CoreFoundation::CGFloat = 1) -> CoreImage::CIImage?
+  public func setSharpenFilter(_ value: Swift::Double, renderScale: CoreFoundation::CGFloat = 1) -> CoreImage::CIImage?
+  public func setVignetteFilter(_ value: Swift::Float, radius: Swift::Float) -> CoreImage::CIImage?
+  public func setNoiceFilter(_ value: CoreFoundation::CGFloat) -> CoreImage::CIImage?
+  public func applyOpacity(alpha: Swift::Double) -> CoreImage::CIImage?
+  public func multiplyColor(_ image: CoreImage::CIImage, by color: SwiftUICore::Color) -> CoreImage::CIImage?
+  public func setLightLeak(_ color: CoreImage::CIColor) -> CoreImage::CIImage?
+  public func setBokeh(_ value: Swift::Double, depthData: AVFoundation::AVDepthData, orientation: Swift::Int32) -> CoreImage::CIImage
+  public func setBokeh(_ value: Swift::Double, depthData: AVFoundation::AVDepthData, personMask: CoreImage::CIImage?, orientation: Swift::Int32) -> CoreImage::CIImage
+  public func blur(amount: CoreFoundation::CGFloat) -> CoreImage::CIImage?
+  public func rotateAndScale(rotation: CoreFoundation::CGFloat) -> CoreImage::CIImage?
+  public func flipAndRotateImage(editRotation: PhotoEditKit::EditRotation) -> CoreImage::CIImage?
+  public func cropArea(rect: CoreFoundation::CGRect) -> CoreImage::CIImage?
+}
+public enum ColorBoostBand : Swift::CaseIterable {
+  case red
+  case yellow
+  case green
+  case cyan
+  case blue
+  case magenta
+  public var hue: Swift::Float {
+    get
+  }
+  public static func == (a: PhotoEditKit::ColorBoostBand, b: PhotoEditKit::ColorBoostBand) -> Swift::Bool
+  public typealias AllCases = [PhotoEditKit::ColorBoostBand]
+  nonisolated public static var allCases: [PhotoEditKit::ColorBoostBand] {
+    get
+  }
+  public func hash(into hasher: inout Swift::Hasher)
+  public var hashValue: Swift::Int {
+    get
+  }
+}
+@_hasMissingDesignatedInitializers final public class ColorBoostProcessor {
+  public static func filter(amounts: [PhotoEditKit::ColorBoostBand : Swift::Float]) -> (any CoreImage::CIFilter & CoreImage::CIColorCubeWithColorSpace)?
+  public static func weight(of band: PhotoEditKit::ColorBoostBand, atHue hue: Swift::Float) -> Swift::Float
+  public static func applied(to color: Swift::SIMD3<Swift::Float>, amounts: [PhotoEditKit::ColorBoostBand : Swift::Float]) -> Swift::SIMD3<Swift::Float>
+  @objc deinit
+}
+@_hasMissingDesignatedInitializers public class CropHelper {
+  public static func checkAndCorrectRatio(rect: CoreFoundation::CGRect, image: UIKit::UIImage, aspectRatio: PhotoEditKit::EditAspectRatio, selectedPosition: PhotoEditKit::DragPosition) -> CoreFoundation::CGRect
+  public static func requiredScaleAfterRotation(degrees theta: CoreFoundation::CGFloat, width: CoreFoundation::CGFloat, height: CoreFoundation::CGFloat) -> CoreFoundation::CGFloat
+  @objc deinit
+}
+public enum HDRGainMap {
+  public static let makerAppleKeys: [Swift::String]
+  public static func read(from photo: AVFoundation::AVCapturePhoto) -> CoreImage::CIImage?
+  public static func read(from data: Foundation::Data, orientation: ImageIO::CGImagePropertyOrientation) -> CoreImage::CIImage?
+  public static func encode(_ image: CoreGraphics::CGImage, gainMap: CoreImage::CIImage, type: UniformTypeIdentifiers::UTType, quality: CoreFoundation::CGFloat) -> Foundation::Data?
+  public static func hasGainMap(_ source: ImageIO::CGImageSource) -> Swift::Bool
+  public static func copy(from source: ImageIO::CGImageSource, to destination: ImageIO::CGImageDestination)
+}
+public class PostProcessingHelper {
+  public var image: CoreImage::CIImage
+  public init(image: CoreGraphics::CGImage)
+  public func setGainMap(_ gainMap: CoreImage::CIImage)
+  public func applyGeometry(_ transform: (CoreImage::CIImage) -> CoreImage::CIImage?)
+  public func gainMapOutput() -> CoreImage::CIImage?
+  public func applyEditConfig(config: PhotoEditKit::EditConfig, renderScale: CoreFoundation::CGFloat = 1, rawRecovery: PhotoEditKit::RawRecoveryLayers? = nil, includeVignette: Swift::Bool = true)
+  public func applyVignette(config: PhotoEditKit::EditConfig)
+  @PhotoEditKit::LogicActor public func applyRotationCropConfig(config: PhotoEditKit::EditConfig)
+  @PhotoEditKit::LogicActor public func applyFullRotateAndFlip(editRotation: PhotoEditKit::EditRotation)
+  public func toCGImage() -> CoreGraphics::CGImage?
+  @objc deinit
+}
+@_hasMissingDesignatedInitializers final public class RawHighlightRecovery {
+  public static let EXPOSURE_STOPS: Swift::Float
+  final public let recoverableFraction: Swift::Double
+  public static func fit(base: CoreGraphics::CGImage, recovery: CoreGraphics::CGImage) -> PhotoEditKit::RawHighlightRecovery?
+  final public func apply(to base: CoreImage::CIImage, recovery: CoreImage::CIImage, amount: Swift::Double) -> CoreImage::CIImage
+  @objc deinit
+}
+extension PhotoEditKit::RawHighlightRecovery {
+  public struct Layer {
+    public let recovery: PhotoEditKit::RawHighlightRecovery
+    public let image: CoreGraphics::CGImage
+  }
+}
+public struct RawRecoveryLayers {
+  public var shadows: PhotoEditKit::RawShadowRecovery.PhotoEditKit::Layer?
+  public var highlights: PhotoEditKit::RawHighlightRecovery.PhotoEditKit::Layer?
+  public var isEmpty: Swift::Bool {
+    get
+  }
+  public func downscaled(maxDimension: CoreFoundation::CGFloat) -> PhotoEditKit::RawRecoveryLayers
+  public func apply(to image: CoreImage::CIImage, config: PhotoEditKit::EditConfig) -> CoreImage::CIImage
+}
+public enum RawToneFit {
+  public static let FIT_SIZE: Swift::Int
+  public static let MIN_BIN_SAMPLES: Swift::Int
+  public static let CUBE_DIMENSION: Swift::Int
+  public static let AMOUNT_STEPS: Swift::Float
+  public static let MAX_HERMITE_SLOPE: Swift::Float
+  public static let DETAIL_SPREAD_FLOOR: Swift::Double
+  public static let DETAIL_SPREAD_FULL: Swift::Double
+  public static func luma(_ r: Swift::UInt8, _ g: Swift::UInt8, _ b: Swift::UInt8) -> Swift::Float
+  public static func fitCurve(sums: [Swift::Double], counts: [Swift::Int]) -> (curve: [Swift::Float], first: Swift::Int, last: Swift::Int)?
+  public static func recoverableFraction(histogram: [Swift::Int], inRange: Swift::Int, lost: Swift::Int, total: Swift::Int, minLostShare: Swift::Double) -> Swift::Double
+  public static func input(where curve: [Swift::Float], reaches value: Swift::Float, in range: Swift::ClosedRange<Swift::Int>) -> Swift::Float
+  public static func slope(of curve: [Swift::Float], at x: Swift::Float, in range: Swift::ClosedRange<Swift::Int>) -> Swift::Float
+  public static func hermite(_ t: Swift::Float, start: Swift::Float, end: Swift::Float) -> Swift::Float
+  public static func cubeData(map: [Swift::Float]) -> Foundation::Data
+  public static func blend(base: CoreImage::CIImage, offset: CoreImage::CIImage, cube: Foundation::Data, from: Swift::Float, to: Swift::Float) -> CoreImage::CIImage
+}
+@_hasMissingDesignatedInitializers final public class RawToneCubeCache {
+  final public func cube(step: Swift::Int, build: () -> Foundation::Data) -> Foundation::Data
+  @objc deinit
+}
+@_hasMissingDesignatedInitializers final public class RawShadowRecovery {
+  public static let EXPOSURE_STOPS: Swift::Float
+  final public let recoverableFraction: Swift::Double
+  public static func fit(base: CoreGraphics::CGImage, recovery: CoreGraphics::CGImage) -> PhotoEditKit::RawShadowRecovery?
+  final public func apply(to base: CoreImage::CIImage, recovery: CoreImage::CIImage, amount: Swift::Double) -> CoreImage::CIImage
+  @objc deinit
+}
+extension PhotoEditKit::RawShadowRecovery {
+  public struct Layer {
+    public let recovery: PhotoEditKit::RawShadowRecovery
+    public let image: CoreGraphics::CGImage
+  }
+}
+final public class SelectiveColorProcessor {
+  final public let maskFilter: any CoreImage::CIFilter & CoreImage::CIColorCube
+  public init(keep color: SwiftUICore::Color, tolerance: Swift::Float = 0.3)
+  @objc deinit
+}
+public enum ColorMath {
+  public static func rgbToHSV(_ c: Swift::SIMD3<Swift::Float>) -> Swift::SIMD3<Swift::Float>
+  public static func smoothstep(edge0: Swift::Float, edge1: Swift::Float, x: Swift::Float) -> Swift::Float
+}
+public enum StyleMatcher {
+  public struct Statistics {
+    public let levels: [Swift::Float]
+  }
+  public struct Transform : Swift::Equatable {
+    public let source: [Swift::Float]
+    public let destination: [Swift::Float]
+    public var isMeaningful: Swift::Bool {
+      get
+    }
+    public func map(_ luma: Swift::Float) -> Swift::Float
+    public static func == (a: PhotoEditKit::StyleMatcher.PhotoEditKit::Transform, b: PhotoEditKit::StyleMatcher.PhotoEditKit::Transform) -> Swift::Bool
+  }
+  @PhotoEditKit::LogicActor public static func statistics(for image: UIKit::UIImage) -> PhotoEditKit::StyleMatcher.PhotoEditKit::Statistics?
+  public static func average(of statistics: [PhotoEditKit::StyleMatcher.PhotoEditKit::Statistics]) -> PhotoEditKit::StyleMatcher.PhotoEditKit::Statistics?
+  public static func transform(for target: PhotoEditKit::StyleMatcher.PhotoEditKit::Statistics, matching reference: PhotoEditKit::StyleMatcher.PhotoEditKit::Statistics) -> PhotoEditKit::StyleMatcher.PhotoEditKit::Transform?
+  @PhotoEditKit::LogicActor public static func filter(for transform: PhotoEditKit::StyleMatcher.PhotoEditKit::Transform) -> (any CoreImage::CIFilter & CoreImage::CIColorCubeWithColorSpace)?
+}
+extension UIKit::UIImage {
+  @PhotoEditKit::LogicActor public func applyingStyleTransform(_ transform: PhotoEditKit::StyleMatcher.PhotoEditKit::Transform) -> UIKit::UIImage
+}
+extension UIKit::UIImage.UIKit::Orientation {
+  public init(_ cg: ImageIO::CGImagePropertyOrientation)
+  public init(rotation: CoreFoundation::CGFloat)
+  public init(mirroredRotation: CoreFoundation::CGFloat)
+}
+extension CoreGraphics::CGImage {
+  public func convertCGImage(to type: UniformTypeIdentifiers::UTType, quality: CoreFoundation::CGFloat = 1.0) -> Foundation::Data?
+}
+extension CoreFoundation::CGRect {
+  public var isFinite: Swift::Bool {
+    get
+  }
+}
+extension Foundation::Thread {
+  public var ciContext: CoreImage::CIContext {
+    get
+  }
+}
+extension CoreGraphics::CGImage {
+  public func downscaled(maxDimension: CoreFoundation::CGFloat) -> CoreGraphics::CGImage
+}
+extension SwiftUICore::Color {
+  public func toRGB() -> (red: CoreFoundation::CGFloat, green: CoreFoundation::CGFloat, blue: CoreFoundation::CGFloat, alpha: CoreFoundation::CGFloat)?
+  public func linearRGB() -> Swift::SIMD3<Swift::Float>?
+}
+@_hasMissingDesignatedInitializers @globalActor public actor LogicActor {
+  public static let shared: PhotoEditKit::LogicActor
+  public typealias ActorType = PhotoEditKit::LogicActor
+  @objc deinit
+  @_semantics("defaultActor") nonisolated final public var unownedExecutor: _Concurrency::UnownedSerialExecutor {
+    get
+  }
+}
+@_hasMissingDesignatedInitializers @globalActor public actor AIActor {
+  public static let shared: PhotoEditKit::AIActor
+  public typealias ActorType = PhotoEditKit::AIActor
+  @objc deinit
+  @_semantics("defaultActor") nonisolated final public var unownedExecutor: _Concurrency::UnownedSerialExecutor {
+    get
+  }
+}
+@_hasMissingDesignatedInitializers @globalActor public actor CaptureProcessingActor {
+  public static let shared: PhotoEditKit::CaptureProcessingActor
+  public typealias ActorType = PhotoEditKit::CaptureProcessingActor
+  @objc deinit
+  @_semantics("defaultActor") nonisolated final public var unownedExecutor: _Concurrency::UnownedSerialExecutor {
+    get
+  }
+}
+@PhotoEditKit::CaptureProcessingActor public func onCaptureProcessingActor<T>(_ work: () -> T) async -> T
+@discardableResult
+public func runOnAIThread(_ block: @escaping @PhotoEditKit::AIActor () async throws -> Swift::Void) -> _Concurrency::Task<(), Swift::Never>
+@discardableResult
+public func runOnMainThread(delayDuration: Swift::Double = 0, _ block: @escaping @_Concurrency::MainActor () async throws -> Swift::Void) -> _Concurrency::Task<(), Swift::Never>
+@discardableResult
+public func runOnLogicThread(delayDuration: Swift::Double = 0, repeatDuration: Swift::Double = -1, priority: _Concurrency::TaskPriority? = nil, _ block: @escaping @PhotoEditKit::LogicActor () async throws -> Swift::Void) -> _Concurrency::Task<(), Swift::Never>
+extension PhotoEditKit::AIScene : Swift::Equatable {}
+extension PhotoEditKit::AIScene : Swift::Hashable {}
+extension PhotoEditKit::AIScene : Swift::RawRepresentable {}
+extension PhotoEditKit::EditController.PhotoEditKit::Action : Swift::Equatable {}
+extension PhotoEditKit::EditController.PhotoEditKit::Action : Swift::Hashable {}
+extension PhotoEditKit::EditAspectRatio : Swift::Equatable {}
+extension PhotoEditKit::EditAspectRatio : Swift::Hashable {}
+extension PhotoEditKit::EditRotation : Swift::Equatable {}
+extension PhotoEditKit::EditRotation : Swift::Hashable {}
+extension PhotoEditKit::EditSettingType : Swift::Equatable {}
+extension PhotoEditKit::EditSettingType : Swift::Hashable {}
+extension PhotoEditKit::ColorBoostBand : Swift::Equatable {}
+extension PhotoEditKit::ColorBoostBand : Swift::Hashable {}
+extension PhotoEditKit::LogicActor : _Concurrency::GlobalActor {}
+extension PhotoEditKit::AIActor : _Concurrency::GlobalActor {}
+extension PhotoEditKit::CaptureProcessingActor : _Concurrency::GlobalActor {}
