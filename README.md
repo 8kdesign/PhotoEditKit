@@ -5,6 +5,7 @@ with undo/redo and export, and on-device AI that suggests edits for a photo.
 
 Everything runs on the device. PhotoEditKit makes no network requests.
 
+- [Examples](#examples)
 - [Requirements](#requirements)
 - [Installation](#installation)
 - [Quick start: let the AI edit a photo](#quick-start-let-the-ai-edit-a-photo)
@@ -17,6 +18,17 @@ Everything runs on the device. PhotoEditKit makes no network requests.
 - [Matching a style](#matching-a-style)
 - [Threading](#threading)
 - [Localization](#localization)
+
+## Examples
+
+Each photo on the left, and on the right the edit the AI suggested for it.
+
+| Original | AI edit |
+| :---: | :---: |
+| <img src="Images/forest-original.jpg" width="320" alt="Overcast forest, original"> | <img src="Images/forest-edited.jpg" width="320" alt="Overcast forest, AI edit"> |
+| <img src="Images/valley-original.jpg" width="320" alt="Mountain valley, original"> | <img src="Images/valley-edited.jpg" width="320" alt="Mountain valley, AI edit"> |
+| <img src="Images/totem-original.jpg" width="320" alt="Carved pole against a grey sky, original"> | <img src="Images/totem-edited.jpg" width="320" alt="Carved pole against a grey sky, AI edit"> |
+| <img src="Images/red-panda-original.jpg" width="320" alt="Red panda in warm, hazy light, original"> | <img src="Images/red-panda-edited.jpg" width="320" alt="Red panda in warm, hazy light, AI edit"> |
 
 ## Requirements
 
