@@ -11,6 +11,7 @@ Everything runs on the device. PhotoEditKit makes no network requests.
 - [Edits: `EditConfig`](#edits-editconfig)
 - [Rendering an edit](#rendering-an-edit)
 - [AI suggestions](#ai-suggestions)
+- [The recipes](#the-recipes)
 - [Building an editor with `EditController`](#building-an-editor-with-editcontroller)
 - [Exporting with HDR](#exporting-with-hdr)
 - [Matching a style](#matching-a-style)
@@ -114,16 +115,31 @@ let gentler = EditConfig(properties: properties, crop: config.crop, editRotation
 | `.rotation` | −45 … 45 | degrees, straightening |
 | `.depth` | 0 … 40 | background blur; needs depth data |
 
-The ranges are also available as constants (`EXPOSURE_MIN`, `EXPOSURE_MAX`, …).
 `type.getSetting()` returns an `EditSetting` with the localized name, an SF
-Symbol and the range, which is everything you need to build a slider.
+Symbol and the range (`minValue`, `maxValue`), which is everything you need to
+build a slider.
+
+Everything public uses this one scale. Read a value with
+`config.value(of: .saturation)` (0 when untouched), and make a change with
+`setting.getEditConfig(amount)`, which is ready for `previewConfig` and
+`addConfig`:
+
+```swift
+let saturation = EditSettingType.saturation.getSetting()
+let current = editor.currentConfig.value(of: .saturation)       // e.g. 0.2
+editor.addConfig(saturation.getEditConfig(0.1))                  // now 0.3
+```
+
 `availableEditSettings`, `colorBoostSettings` and `rotationSettings` list the
 settings in display order.
 
-Crop is `config.crop`, a rect in normalized coordinates (`DEFAULT_CROP` is the
-whole image). Quarter turns and flips are `config.editRotation` (`EditRotation`).
+Crop is `config.crop`, a rect in normalized coordinates, where `(0, 0, 1, 1)` is
+the whole image. Quarter turns and flips are `config.editRotation` (`EditRotation`).
 
-Several configs can be merged into one with `[config1, config2].combine()`.
+An `EditConfig` can't be changed once it's made, so the editor's
+`currentConfig` can't be changed behind its back either. To change an edit,
+make a new config, or pass a change to the editor. Several configs can be
+merged into one with `[config1, config2].combine()`.
 
 ## Rendering an edit
 
@@ -157,7 +173,7 @@ colour and tone part alone.
 
 All AI is reached through `AIPostProcessingHelper`. The calls are synchronous
 and take a noticeable amount of time on full-resolution photos, so run them off
-the main thread (for example inside `runOnAIThread { … }`).
+the main thread (for example inside `Task.detached { … }`).
 
 ### One edit
 
@@ -170,18 +186,18 @@ never crops or rotates. A copy of about 512 px on the long edge is enough to
 pass in, and is much faster than full resolution. A `CGImage` carries no
 orientation, so turn it upright before passing it in.
 
-### A list of looks
+### A list of suggestions
 
 ```swift
-let looks: [EditSuggestion] = AIPostProcessingHelper.suggestions(for: uiImage, metadata: properties)
-for look in looks {
-    look.title      // LocalizedStringResource, e.g. "Brighten"
-    look.config     // EditConfig to apply
-    look.thumbnail  // small rendered preview, ready for a picker
+let suggestions: [EditSuggestion] = AIPostProcessingHelper.suggestions(for: uiImage, metadata: properties)
+for suggestion in suggestions {
+    suggestion.title      // LocalizedStringResource, e.g. "Brighten"
+    suggestion.config     // EditConfig to apply
+    suggestion.thumbnail  // small rendered preview, ready for a picker
 }
 ```
 
-Returns up to ten looks, best first. Pass the photo at full resolution. Its
+Returns up to ten suggestions, best first. Pass the photo at full resolution. Its
 `imageOrientation` is honoured. If the
 calling `Task` is cancelled, it stops early and returns an empty array.
 
@@ -204,6 +220,64 @@ scene?.icon    // SF Symbol name
 The scenes are `people`, `animals`, `food`, `object`, `indoor`, `city`, `sky`,
 `nature` and `light`. It returns `nil` when the photo couldn't be classified.
 
+## The recipes
+
+Each suggestion comes from one of a fixed set of recipes. The AI uses only
+the recipes that suit the photo, sizes each one to it, and puts the one the
+photo most needs first. The same recipe can come out differently on two photos: Vivid on a
+landscape leans into its greens, Vivid on a street at night into its lights.
+
+There are two kinds. **Corrections** fix something about the photo: its
+exposure, its colour or its noise. **Styles** are a matter of taste. When a
+photo needs fixing, corrections come first.
+
+### Corrections
+
+| Recipe | What it does |
+|---|---|
+| Original | RAW photos only. Matches the camera's own rendering of the RAW, which is usually livelier than a plain develop. Every other recipe on a RAW starts from it. |
+| Clean Up | Reduces grain and noise, and leaves tone and colour alone. |
+| Balance Light | RAW photos only. Opens up the shadows and brings back the highlights together, for backlit or high-contrast scenes. |
+| Brighten | Lifts a photo that came out too dark. |
+| Deepen | The opposite of Brighten: richer blacks and more contrast for a photo that looks grey or washed out, without lightening it. |
+| Recover Highlights | Brings back detail in bright areas such as a sky or a lit window. |
+| Lift Shadows | Opens up dark areas without brightening the rest of the photo. |
+| Warm Up | Takes a blue or cold colour cast back to neutral. |
+| Cool Down | Takes an orange or yellow colour cast back to neutral. |
+| True Color | For daylight photos where people and buildings in shade have turned blue and milky under a bright sky. Warms the shade and restores its contrast. |
+
+Warm Up and Cool Down correct a cast; they don't add one. A photo with
+balanced colour gets neither.
+
+### Styles
+
+| Recipe | What it does |
+|---|---|
+| Crisp | Sharper detail with a little more contrast. |
+| Punch | Stronger contrast and clarity, with a moderate colour boost. |
+| Vivid | Richer, more saturated colour, led by the colours the photo is about. |
+| Muted | Quieter colour overall, while the main subject keeps its own. |
+| Matte | A faded, film-print style: softened blacks, gentler colour and a light vignette. |
+| Soft | A gentle, warm finish with low contrast. |
+| Spotlight | Darkens the edges to draw the eye to the middle of the photo. Leaves colour alone. |
+
+### Every recipe
+
+- **Faces:** skin tones stay natural, and a soft face is sharpened slightly
+  (except in Clean Up and Soft, which aim for a smoother result).
+- **Grain:** recipes that would make grain more visible clean it up as part
+  of the edit.
+- **One at a time:** applying a suggestion replaces the previous one rather
+  than stacking on it. Adjustments made after a suggestion stay separate, so they can be
+  undone on their own.
+- **Small edits are skipped:** a recipe that would barely change the photo isn't
+  offered, which is why a good photo can get few suggestions, and
+  `topSuggestion` can return `nil`.
+- **Plain edits:** a suggestion is an ordinary `EditConfig`, so its values can be
+  read and adjusted with the sliders like any other edit.
+
+Recipe names come back localized in `EditSuggestion.title`.
+
 ## Building an editor with `EditController`
 
 `EditController` is an `ObservableObject` that runs a complete editing
@@ -214,11 +288,15 @@ the photo through an `EditSource` and build whatever UI you like on top.
 ### 1. Provide the photo
 
 `EditController` doesn't know about the photo library or files. It reads
-everything through your `EditSource`. For an ordinary image file, most methods
-have nothing to return:
+everything through your `EditSource`. An ordinary photo needs only three
+methods; the RAW and depth ones have defaults.
 
 ```swift
-final class FileEditSource: EditSource {
+// `nonisolated` because the editor calls the source from its own actor, not
+// the main actor that new Xcode projects give every type by default.
+// `@unchecked Sendable` because the source is shared with that actor: it's
+// safe here since nothing changes after `init`.
+nonisolated final class FileEditSource: EditSource, @unchecked Sendable {
     let data: Data
     let imageSource: CGImageSource
 
@@ -228,23 +306,10 @@ final class FileEditSource: EditSource {
         self.imageSource = source
     }
 
-    var isRaw: Bool { false }
-
-    var orientation: CGImagePropertyOrientation {
-        let properties = CGImageSourceCopyPropertiesAtIndex(imageSource, 0, nil) as? [String: Any]
-        let value = properties?[kCGImagePropertyOrientation as String] as? UInt32
-        return value.flatMap(CGImagePropertyOrientation.init(rawValue:)) ?? .up
-    }
-
     // The full-resolution photo. A UIImage's imageOrientation is honoured, so
     // you don't need to redraw a photo that carries an EXIF orientation.
     @LogicActor func loadOriginal() async -> EditSourceImage? {
-        let options: [CFString: Any] = [
-            kCGImageSourceCreateThumbnailFromImageAlways: true,
-            kCGImageSourceCreateThumbnailWithTransform: true,
-        ]
-        guard let image = CGImageSourceCreateThumbnailAtIndex(imageSource, 0, options as CFDictionary) else { return nil }
-        return EditSourceImage(image: UIImage(cgImage: image), isDevelopedRaw: false)
+        UIImage(data: data).map { EditSourceImage(image: $0, isDevelopedRaw: false) }
     }
 
     // The ImageIO properties. The AI reads exposure information from them.
@@ -257,19 +322,30 @@ final class FileEditSource: EditSource {
         (data, orientation)
     }
 
-    // Only used for RAW files and photos with depth.
-    @LogicActor func loadRawExtras(developSize: CGSize, exposures: [Float], referenceMaxDimension: CGFloat) async -> RawEditingExtras {
-        RawEditingExtras(cameraReference: nil, offsetDevelops: [:])
+    private var orientation: CGImagePropertyOrientation {
+        let properties = CGImageSourceCopyPropertiesAtIndex(imageSource, 0, nil) as? [String: Any]
+        let value = properties?[kCGImagePropertyOrientation as String] as? UInt32
+        return value.flatMap(CGImagePropertyOrientation.init(rawValue:)) ?? .up
     }
-    func developRaw(targetSize: CGSize, exposures: [Float]) async -> [Float: CGImage] { [:] }
-    @LogicActor func loadDepth() async -> (data: AVDepthData, orientation: Int32)? { nil }
-    @LogicActor func defaultBlurRadius(depthData: AVDepthData, imageSize: CGSize) async -> CGFloat { 0 }
 }
 ```
 
-`loadPreview(maxDimension:)` is optional. Implement it if you can make a small
-copy more cheaply than shrinking the original, for example if you already have
-one on screen.
+For a RAW, implement `isRaw`, `loadRawExtras` and `developRaw`; for depth
+(portrait blur), `loadDepth` and `defaultBlurRadius`. `loadPreview(maxDimension:)`
+is optional too: implement it if you can make a small copy more cheaply than
+shrinking the original, for example if you already have one on screen.
+
+#### Actor isolation
+
+The editor calls your source from its own actors, so the source mustn't be
+tied to the main actor:
+
+- In a project with **Default Actor Isolation** set to **MainActor** (the
+  default for new Xcode projects), mark the class `nonisolated` as above.
+  Without it, Swift 5 mode warns and Swift 6 mode refuses to compile.
+- The source is handed to the editor's actor, so it has to be `Sendable`. A
+  class that doesn't change after `init` can declare `@unchecked Sendable`;
+  one that does needs a lock around what changes.
 
 ### 2. Run the session
 
@@ -277,8 +353,8 @@ one on screen.
 // On the main actor, e.g. in your view model
 let editor = EditController()
 
-// Show `editor.editedImage` (a preview-sized UIImage) in your UI. It appears
-// as soon as the photo has loaded, and updates after every edit.
+// Show `editor.editedImage` (a preview-sized UIImage) in your UI. It's set by
+// the time `prepare` returns, and updates after every edit.
 // Observe `editor.aiProcessingState` for suggestions.
 
 editor.processAI()                        // ask for suggestions; runs once the photo has loaded
@@ -297,12 +373,12 @@ twice gives an exposure of 0.2.
 
 | | |
 |---|---|
-| `applySuggestion(_:)` | apply an AI look; `nil` removes it. `appliedSuggestionID` tells you which one is on |
+| `applySuggestion(_:)` | apply an AI suggestion; `nil` removes it. `appliedSuggestionID` tells you which one is on |
 | `previewConfig(_:)` | show a change while a slider is moving, without adding it to the history. Each call replaces the previous preview |
 | `confirmPreviewConfig()` | commit the previewed change when the slider is released |
 | `addConfig(_:)` | commit a change in one step |
 | `undoConfig()` / `redoConfig()` | with `canUndo()` / `canRedo()`; see below for keeping buttons up to date |
-| `historyCount` | how many steps undo can go back. To stop undo at a point (e.g. right after a look was applied), read it there and allow undo only while it's larger |
+| `historyCount` | how many steps undo can go back. To stop undo at a point (e.g. right after a suggestion was applied), read it there and allow undo only while it's larger |
 | `hasEdits()` | whether anything has been changed |
 | `showOriginalImage` | a flag for your UI, e.g. while a "compare" button is held. The controller doesn't swap images itself: show `sourcePreviewImage` while it's `true` |
 | `currentConfig` | the edit as it stands |
@@ -352,10 +428,11 @@ Photos taken on recent iPhones carry an HDR gain map. To keep it in an export,
 encode the image and the gain map together:
 
 ```swift
-let data = rendered.gainMap.flatMap {
-    HDRGainMap.encode(rendered.image, gainMap: $0, type: .heic, quality: 0.9)
-} ?? rendered.image.convertCGImage(to: .heic, quality: 0.9)
+let data = HDRGainMap.encode(rendered.image, gainMap: rendered.gainMap, type: .heic, quality: 0.9)
 ```
+
+When there's no gain map, or attaching it fails, the image is encoded on its
+own, so you get a file either way.
 
 If you then copy the data into a `CGImageDestination` to add metadata, call
 `HDRGainMap.copy(from:to:)` as well, because ImageIO leaves the gain map behind
@@ -380,22 +457,22 @@ Use `StyleMatcher.average(of:)` to combine several references into one.
 
 ## Threading
 
-PhotoEditKit uses three global actors of its own. Calls marked with them can
-be awaited from anywhere:
+Calls are marked with the actor they run on, and can be awaited from anywhere:
 
-- `LogicActor` for loading, rendering and export (`EditController.prepare`,
-  `renderForExport`, `PostProcessingHelper` geometry, `StyleMatcher`).
-- `AIActor` for AI work. `runOnAIThread { … }` runs a closure on it.
-  `EditController` uses it for suggestions.
+- `LogicActor`, PhotoEditKit's own actor, for loading, rendering and export
+  (`EditController.prepare`, `renderForExport`, `PostProcessingHelper`
+  geometry, `StyleMatcher`, and your `EditSource`'s `loadOriginal`).
 - `MainActor` for everything on `EditController` that changes the edit
   (`addConfig`, `applySuggestion`, `undoConfig`, …).
+
+`EditController` runs its AI suggestions on a background actor of its own.
 
 `AIPostProcessingHelper` and `applyingEditConfig` aren't tied to an actor. Call
 them from wherever suits you, just not on the main thread for full-size images.
 
 ## Localization
 
-Setting names, look titles and scene names come back as
+Setting names, recipe names and scene names come back as
 `LocalizedStringResource` in English and Simplified Chinese, and follow the
 device language. Display them with `Text(title)` in SwiftUI, or
 `String(localized: title)` in UIKit.

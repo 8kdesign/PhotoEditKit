@@ -10,6 +10,10 @@ let package = Package(
         .library(name: "PhotoEditKit", targets: ["PhotoEditKit"])
     ],
     targets: [
-        .binaryTarget(name: "PhotoEditKit", path: "PhotoEditKit.xcframework")
+        .binaryTarget(
+            name: "PhotoEditKit",
+            url: "https://github.com/api/v4/projects/8kdesign%2FPhotoEditKit/packages/generic/PhotoEditKit/1.0.1/PhotoEditKit.xcframework.zip",
+            checksum: "5b35631292c54dd55a32aff140414446fc638c24a951d5b62673386243f0dd37"
+        )
     ]
 )
