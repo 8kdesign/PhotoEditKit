@@ -267,6 +267,7 @@ balanced colour gets neither.
 |---|---|
 | Crisp | Sharper detail with a little more contrast. |
 | Punch | Stronger contrast and clarity, with a moderate colour boost. |
+| Pop | Brighter and punchier together, for a dim frame with a light-coloured subject such as a glass of juice in a lamp-lit room. Lifts the subject, deepens the dark surround and pulls the highlights back so lights stay clean. |
 | Vivid | Richer, more saturated colour, led by the colours the photo is about. |
 | Muted | Quieter colour overall, while the main subject keeps its own. |
 | Matte | A faded, film-print style: softened blacks, gentler colour and a light vignette. |
