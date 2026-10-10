@@ -1,9 +1,52 @@
 # PhotoEditKit
 
-Photo editing for iOS: a Core Image edit pipeline, a ready-made editor model
-with undo/redo and export, and on-device AI that suggests edits for a photo.
+[![Swift Package Manager](https://img.shields.io/badge/SPM-compatible-brightgreen?logo=swift)](#swift-package-manager)
+[![iOS 17.6+](https://img.shields.io/badge/iOS-17.6%2B-blue?logo=apple)](#requirements)
+[![On-device](https://img.shields.io/badge/network-none-lightgrey)](#privacy)
+[![License: MIT](https://img.shields.io/badge/license-MIT-yellow)](LICENSE)
 
-Everything runs on the device. PhotoEditKit makes no network requests.
+**One call gives a photo the edit it needs, entirely on the device.**
+
+PhotoEditKit is a photo editing toolkit for iOS apps. It looks at a photo
+(exposure, colour cast, faces, subject, grain, scene) and suggests edits you
+can show as a picker or apply straight away. It also includes the Core Image
+pipeline that renders them and an editor model for building your own editing
+screen.
+
+| Original | AI edit |
+| :---: | :---: |
+| <img src="Images/forest-original.jpg" width="320" alt="Overcast forest, original"> | <img src="Images/forest-edited.jpg" width="320" alt="Overcast forest, AI edit"> |
+| <img src="Images/valley-original.jpg" width="320" alt="Mountain valley, original"> | <img src="Images/valley-edited.jpg" width="320" alt="Mountain valley, AI edit"> |
+
+[More examples](#examples)
+
+```swift
+if let config = AIPostProcessingHelper.topSuggestion(for: photo, metadata: properties) {
+    let edited = CIImage(cgImage: photo).applyingEditConfig(config)
+}
+```
+
+## Features
+
+- **AI edit suggestions.** Up to ten ranked looks per photo, each with a
+  title and a thumbnail, or a single best edit. A photo that's already good
+  gets `nil` rather than a style it didn't ask for.
+- **Corrections and styles.** Brighten, Lift Shadows, Recover Highlights,
+  Warm Up, Cool Down, Clean Up and more fix problems. Vivid, Punch, Matte,
+  Muted, Soft and others are styles, sized to each photo. [See every recipe](#the-recipes).
+- **Natural faces.** Every look keeps skin hue and saturation natural.
+- **RAW aware.** Can match the camera's own rendering of a RAW and build the
+  other looks on top of it.
+- **A full editor model.** `EditController` handles loading, live previews,
+  undo/redo, crop, rotation, portrait blur and full-resolution export. You
+  build the UI.
+- **HDR kept.** Exports keep the iPhone's HDR gain map.
+- **Style matching.** Makes one photo's tones match a reference photo.
+- **Private by design.** No network requests, no models to download, no
+  account. Safe to use in app extensions.
+- **Localized** in English and Simplified Chinese.
+
+## Contents
 
 - [Examples](#examples)
 - [Requirements](#requirements)
@@ -18,6 +61,9 @@ Everything runs on the device. PhotoEditKit makes no network requests.
 - [Matching a style](#matching-a-style)
 - [Threading](#threading)
 - [Localization](#localization)
+- [Privacy](#privacy)
+- [Support](#support)
+- [License](#license)
 
 ## Examples
 
@@ -25,16 +71,15 @@ Each photo on the left, and on the right the edit the AI suggested for it.
 
 | Original | AI edit |
 | :---: | :---: |
-| <img src="Images/forest-original.jpg" width="320" alt="Overcast forest, original"> | <img src="Images/forest-edited.jpg" width="320" alt="Overcast forest, AI edit"> |
-| <img src="Images/valley-original.jpg" width="320" alt="Mountain valley, original"> | <img src="Images/valley-edited.jpg" width="320" alt="Mountain valley, AI edit"> |
 | <img src="Images/totem-original.jpg" width="320" alt="Carved pole against a grey sky, original"> | <img src="Images/totem-edited.jpg" width="320" alt="Carved pole against a grey sky, AI edit"> |
 | <img src="Images/red-panda-original.jpg" width="320" alt="Red panda in warm, hazy light, original"> | <img src="Images/red-panda-edited.jpg" width="320" alt="Red panda in warm, hazy light, AI edit"> |
 
 ## Requirements
 
-- iOS 17.6 or later, on a device or the simulator
-- Xcode with the same Swift compiler that built this release, or a newer one
-- Safe to use in app extensions
+- iOS 17.6 or later
+- Xcode with the Swift compiler this release was built with, or a newer one.
+  The framework ships a module interface, so a newer compiler can read it; an
+  older one can't.
 
 ## Installation
 
@@ -42,18 +87,25 @@ PhotoEditKit ships as a binary `PhotoEditKit.xcframework`.
 
 ### Swift Package Manager
 
-In Xcode, choose **File → Add Package Dependencies…**, enter the package URL
-you were given and add the **PhotoEditKit** library to your app target.
+In Xcode, choose **File → Add Package Dependencies…**, enter
+
+```
+https://github.com/8kdesign/PhotoEditKit
+```
+
+and add the **PhotoEditKit** library to your app target.
 
 To declare the dependency in your own `Package.swift`:
 
 ```swift
-.package(url: "<package URL>", from: "1.0.0")
+.package(url: "https://github.com/8kdesign/PhotoEditKit", from: "1.0.0")
 ```
 
 ### Manual
 
-1. Copy `PhotoEditKit.xcframework` into your project folder.
+1. Download `PhotoEditKit.xcframework.zip` from the
+   [latest release](https://github.com/8kdesign/PhotoEditKit/releases/latest),
+   unzip it and copy `PhotoEditKit.xcframework` into your project folder.
 2. In your app target, go to **General → Frameworks, Libraries, and Embedded
    Content**, click **+**, then **Add Other… → Add Files…** and pick the
    `.xcframework`.
@@ -66,19 +118,34 @@ the framework isn't embedded. Check step 3.
 ## Quick start: let the AI edit a photo
 
 ```swift
+import ImageIO
 import PhotoEditKit
 
+guard let source = CGImageSourceCreateWithURL(photoURL as CFURL, nil) else { return }
+let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [String: Any]
+
+// A small upright copy is all the AI needs, and much faster than full size.
+let options = [
+    kCGImageSourceCreateThumbnailFromImageAlways: true,
+    kCGImageSourceCreateThumbnailWithTransform: true,
+    kCGImageSourceThumbnailMaxPixelSize: 512,
+] as CFDictionary
+guard let small = CGImageSourceCreateThumbnailAtIndex(source, 0, options) else { return }
+
 // Off the main thread: this measures the photo.
-if let config = AIPostProcessingHelper.topSuggestion(for: cgImage, metadata: properties) {
-    let edited: CIImage = CIImage(cgImage: cgImage).applyingEditConfig(config)
+if let config = AIPostProcessingHelper.topSuggestion(for: small, metadata: properties),
+   let original = CIImage(contentsOf: photoURL, options: [.applyOrientationProperty: true]) {
+    let edited: CIImage = original.applyingEditConfig(config)
 } else {
     // The photo is already good. Keep it as it is.
 }
 ```
 
 `metadata` is the photo's ImageIO properties
-(`CGImageSourceCopyPropertiesAtIndex`). It's optional, but the suggestions are
-better with it, because it tells the AI how the photo was shot.
+(`CGImageSourceCopyPropertiesAtIndex`). It's optional, but pass it when you
+have it: the exposure values in it are how the AI tells a photo that is dark
+on purpose (a night street, a lamp-lit room) from one that came out too dark.
+Without them, more night photos get brightened.
 
 ## Edits: `EditConfig`
 
@@ -96,9 +163,9 @@ let config = EditConfig(properties: [
 ```
 
 Each value is an **offset from neutral**, so `0` (or leaving the key out)
-means "unchanged". To scale an edit up or down, multiply its values. Leave
-`.aspectratio` and `.rotation` alone when you do, because half a crop isn't a
-gentler crop:
+means "unchanged", whatever the underlying filter treats as neutral. To scale
+an edit up or down, multiply its values. Leave `.aspectratio` and `.rotation`
+alone when you do, because half a crop isn't a gentler crop:
 
 ```swift
 var properties = config.properties
@@ -131,10 +198,10 @@ let gentler = EditConfig(properties: properties, crop: config.crop, editRotation
 Symbol and the range (`minValue`, `maxValue`), which is everything you need to
 build a slider.
 
-Everything public uses this one scale. Read a value with
-`config.value(of: .saturation)` (0 when untouched), and make a change with
-`setting.getEditConfig(amount)`, which is ready for `previewConfig` and
-`addConfig`:
+Read a value with `config.value(of: .saturation)` (0 when untouched), and make
+a change with `setting.getEditConfig(amount)`, which is ready for
+`previewConfig` and `addConfig`. A change made this way carries its setting, so
+consecutive changes to one slider merge into a single undo step:
 
 ```swift
 let saturation = EditSettingType.saturation.getSetting()
@@ -148,25 +215,26 @@ settings in display order.
 Crop is `config.crop`, a rect in normalized coordinates, where `(0, 0, 1, 1)` is
 the whole image. Quarter turns and flips are `config.editRotation` (`EditRotation`).
 
-An `EditConfig` can't be changed once it's made, so the editor's
-`currentConfig` can't be changed behind its back either. To change an edit,
-make a new config, or pass a change to the editor. Several configs can be
-merged into one with `[config1, config2].combine()`.
+`EditConfig` is immutable. `[config1, config2].combine()` merges configs by
+adding their values, the same way the editor stacks changes.
 
 ## Rendering an edit
 
-**Core Image.** Applies the colour and tone settings:
+**Core Image.** Applies the colour and tone settings, and the vignette, but
+not crop or rotation:
 
 ```swift
 let output: CIImage = input.applyingEditConfig(config)
 ```
 
 When you're rendering a preview that is smaller than the photo, pass
-`renderScale` (preview size ÷ full size) so sharpening and noise reduction look
-the same as they will at full size.
+`renderScale` (preview size ÷ full size). Sharpening and noise reduction work
+in pixels, so without it a small preview looks sharper and grainier than the
+export.
 
-**Full render, including crop and rotation.** Use `PostProcessingHelper`. The
-vignette is applied last, so it stays centred on the cropped photo:
+**Full render, including crop and rotation.** Use `PostProcessingHelper`. Turn
+the vignette off in the first step and apply it last, so it is centred on the
+cropped photo rather than the original frame:
 
 ```swift
 // On LogicActor
@@ -194,9 +262,18 @@ AIPostProcessingHelper.topSuggestion(for: cgImage, metadata: properties) -> Edit
 ```
 
 Returns the edit the photo most needs, or `nil` when it doesn't need one. It
-never crops or rotates. A copy of about 512 px on the long edge is enough to
-pass in, and is much faster than full resolution. A `CGImage` carries no
-orientation, so turn it upright before passing it in.
+never crops or rotates. A copy of about 512 px on the long edge is enough, and
+much faster than full resolution. A `CGImage` carries no orientation, so turn
+it upright first.
+
+This is not the same as the first of `suggestions(for:)`:
+
+- If the look that ranks first would barely change the photo, `topSuggestion`
+  returns `nil` rather than the next look down. A good photo stays as it is
+  instead of getting a style it didn't ask for.
+- It doesn't measure grain, since a small copy hides it. Its edit never adds
+  noise reduction on that account. Use `suggestions(for:)` on the full-size
+  photo when grain matters.
 
 ### A list of suggestions
 
@@ -209,12 +286,15 @@ for suggestion in suggestions {
 }
 ```
 
-Returns up to ten suggestions, best first. Pass the photo at full resolution. Its
-`imageOrientation` is honoured. If the
-calling `Task` is cancelled, it stops early and returns an empty array.
+Returns up to ten suggestions, best first. Pass the photo at full resolution,
+which is what the grain measurement needs; its `imageOrientation` is honoured.
+It took about 0.2 s on a 12 MP photo in the simulator; budget more on older
+devices. If the calling `Task` is
+cancelled, it stops at the next stage and returns an empty array.
 
-If you develop RAW files yourself, pass what you know about the RAW for better
-results:
+If you develop RAW files yourself, pass the camera's embedded preview. The
+AI then offers an **Original** suggestion that matches the camera's own
+rendering, and builds every other suggestion on top of it:
 
 ```swift
 let raw = AIPostProcessingHelper.RawContext(cameraReference: embeddedPreview, rawRecovery: nil)
@@ -252,8 +332,8 @@ photo needs fixing, corrections come first.
 | Balance Light | RAW photos only. Opens up the shadows and brings back the highlights together, for backlit or high-contrast scenes. |
 | Brighten | Lifts a photo that came out too dark. |
 | Deepen | The opposite of Brighten: richer blacks and more contrast for a photo that looks grey or washed out, without lightening it. |
-| Recover Highlights | Brings back detail in bright areas such as a sky or a lit window. |
-| Lift Shadows | Opens up dark areas without brightening the rest of the photo. |
+| Recover Highlights | Brings back detail in bright areas such as a sky. Ranks lower when what's blown out is away from the subject, such as a white border or a lit window, since a JPEG has no detail left there to bring back. A RAW that still holds the detail keeps its place. |
+| Lift Shadows | Opens up dark areas without brightening the rest of the photo, including a subject that's dark against a bright sky or window. |
 | Warm Up | Takes a blue or cold colour cast back to neutral. |
 | Cool Down | Takes an orange or yellow colour cast back to neutral. |
 | True Color | For daylight photos where people and buildings in shade have turned blue and milky under a bright sky. Warms the shade and restores its contrast. |
@@ -266,30 +346,31 @@ balanced colour gets neither.
 | Recipe | What it does |
 |---|---|
 | Crisp | Sharper detail with a little more contrast. |
-| Punch | Stronger contrast and clarity, with a moderate colour boost. |
-| Pop | Brighter and punchier together, for a dim frame with a light-coloured subject such as a glass of juice in a lamp-lit room. Lifts the subject, deepens the dark surround and pulls the highlights back so lights stay clean. |
+| Punch | Stronger contrast and clarity, with a moderate colour boost. Keeps the photo's warmth: it doesn't warm or cool it. |
+| Pop | Brighter and punchier at once, for a light-coloured subject in a dim room, such as a glass of juice under a lamp. Not offered on photos with a lot of white. |
 | Vivid | Richer, more saturated colour, led by the colours the photo is about. |
-| Muted | Quieter colour overall, while the main subject keeps its own. |
-| Matte | A faded, film-print style: softened blacks, gentler colour and a light vignette. |
+| Muted | Quieter colour overall, while the main subject keeps its own. Takes out more colour the more colourful the photo is. |
+| Matte | A faded, film-print style: softened blacks, gentler colour and a light vignette. Fades more on a contrasty photo, less on a flat one. |
 | Soft | A gentle, warm finish with low contrast. |
 | Spotlight | Darkens the edges to draw the eye to the middle of the photo. Leaves colour alone. |
 
 ### Every recipe
 
-- **Faces:** skin tones stay natural, and a soft face is sharpened slightly
-  (except in Clean Up and Soft, which aim for a smoother result).
-- **Grain:** recipes that would make grain more visible clean it up as part
-  of the edit.
-- **One at a time:** applying a suggestion replaces the previous one rather
-  than stacking on it. Adjustments made after a suggestion stay separate, so they can be
-  undone on their own.
+- **Faces:** every recipe, corrections included, is adjusted so skin keeps a
+  natural hue and saturation, and a soft face is sharpened slightly (except in
+  Clean Up and Soft). Faces smaller than about 2% of the frame count for less.
+- **Subject and focus:** the AI works out where the subject is from faces,
+  where the eye is drawn and what's in focus. Brighten judges exposure partly
+  by the subject. On a photo with a shallow depth of field, Brighten, Lift
+  Shadows and Recover Highlights judge mostly by the part in focus, so a
+  blurred dark background or blown-out bokeh counts for little.
+- **Grain:** a recipe that would make grain more visible, such as a shadow
+  lift, adds noise reduction for it. A lift that the grain would make too
+  costly is cut back, or the recipe is dropped.
 - **Small edits are skipped:** a recipe that would barely change the photo isn't
-  offered, which is why a good photo can get few suggestions, and
-  `topSuggestion` can return `nil`.
-- **Plain edits:** a suggestion is an ordinary `EditConfig`, so its values can be
-  read and adjusted with the sliders like any other edit.
-
-Recipe names come back localized in `EditSuggestion.title`.
+  offered, so a good photo can get only a few suggestions.
+- **Similar looks are spread out:** when two suggestions would look nearly
+  the same, the second moves down the list.
 
 ## Building an editor with `EditController`
 
@@ -384,9 +465,9 @@ The configs you pass to `previewConfig` and `addConfig` are **changes**, added
 on top of the edit so far. `addConfig(EditConfig(properties: [.exposure: 0.1]))`
 twice gives an exposure of 0.2.
 
-| | |
+| Call | |
 |---|---|
-| `applySuggestion(_:)` | apply an AI suggestion; `nil` removes it. `appliedSuggestionID` tells you which one is on |
+| `applySuggestion(_:)` | apply an AI suggestion; `nil` removes it. `appliedSuggestionID` tells you which one is on. See below for how it treats earlier edits |
 | `previewConfig(_:)` | show a change while a slider is moving, without adding it to the history. Each call replaces the previous preview |
 | `confirmPreviewConfig()` | commit the previewed change when the slider is released |
 | `addConfig(_:)` | commit a change in one step |
@@ -396,6 +477,16 @@ twice gives an exposure of 0.2.
 | `showOriginalImage` | a flag for your UI, e.g. while a "compare" button is held. The controller doesn't swap images itself: show `sourcePreviewImage` while it's `true` |
 | `currentConfig` | the edit as it stands |
 | `aspectRatio`, `editRotation` | crop ratio and quarter turns |
+
+#### Suggestions replace earlier slider work
+
+Applying a suggestion sets every colour and tone setting to the suggestion's
+own value, so slider changes made *before* it are replaced rather than added
+to. A second suggestion replaces the first. Crop, rotation and background blur
+are kept. It all goes on the history as one step: a single undo brings back
+the edit as it was, and applying a suggestion clears redo.
+
+Slider changes made *after* a suggestion are separate steps on top of it.
 
 #### Keeping undo and redo buttons up to date
 
@@ -485,7 +576,28 @@ them from wherever suits you, just not on the main thread for full-size images.
 
 ## Localization
 
-Setting names, recipe names and scene names come back as
-`LocalizedStringResource` in English and Simplified Chinese, and follow the
-device language. Display them with `Text(title)` in SwiftUI, or
-`String(localized: title)` in UIKit.
+Setting, recipe and scene names come back as `LocalizedStringResource`.
+
+| Language | Code |
+|---|---|
+| English | `en` |
+| Simplified Chinese | `zh-Hans` |
+
+## Privacy
+
+PhotoEditKit makes no network requests and collects nothing. Photos, metadata
+and suggestions stay in your app's process. It doesn't download any models,
+so it works offline from the first launch.
+
+## Support
+
+Found a bug, or a photo the AI edits badly? Please
+[open an issue](https://github.com/8kdesign/PhotoEditKit/issues). For a bad
+edit, attach the photo (or a copy at around 1024 px) and say which suggestion
+looked wrong. Real photos are what the recipes are tuned on.
+
+If PhotoEditKit is useful in your app, a ⭐ helps other developers find it.
+
+## License
+
+PhotoEditKit is released under the [MIT License](LICENSE).
