@@ -3,7 +3,6 @@
 [![Swift Package Manager](https://img.shields.io/badge/SPM-compatible-brightgreen?logo=swift)](#swift-package-manager)
 [![iOS 17.6+](https://img.shields.io/badge/iOS-17.6%2B-blue?logo=apple)](#requirements)
 [![On-device](https://img.shields.io/badge/network-none-lightgrey)](#privacy)
-[![License: MIT](https://img.shields.io/badge/license-MIT-yellow)](LICENSE)
 
 **One call gives a photo the edit it needs, entirely on the device.**
 
@@ -63,7 +62,6 @@ if let config = AIPostProcessingHelper.topSuggestion(for: photo, metadata: prope
 - [Localization](#localization)
 - [Privacy](#privacy)
 - [Support](#support)
-- [License](#license)
 
 ## Examples
 
@@ -597,7 +595,3 @@ edit, attach the photo (or a copy at around 1024 px) and say which suggestion
 looked wrong. Real photos are what the recipes are tuned on.
 
 If PhotoEditKit is useful in your app, a ⭐ helps other developers find it.
-
-## License
-
-PhotoEditKit is released under the [MIT License](LICENSE).
