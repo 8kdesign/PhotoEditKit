@@ -2,11 +2,12 @@
 
 [![Swift Package Manager](https://img.shields.io/badge/SPM-compatible-brightgreen?logo=swift)](#swift-package-manager)
 [![iOS 17.6+](https://img.shields.io/badge/iOS-17.6%2B-blue?logo=apple)](#requirements)
+[![macOS 15+](https://img.shields.io/badge/macOS-15%2B-blue?logo=apple)](#requirements)
 [![On-device](https://img.shields.io/badge/network-none-lightgrey)](#privacy)
 
 **One call gives a photo the edit it needs, entirely on the device.**
 
-PhotoEditKit is a photo editing toolkit for iOS apps. It looks at a photo
+PhotoEditKit is a photo editing toolkit for iOS and macOS apps. It looks at a photo
 (exposure, colour cast, faces, subject, grain, scene) and suggests edits you
 can show as a picker or apply straight away. It also includes the Core Image
 pipeline that renders them and an editor model for building your own editing
@@ -34,6 +35,8 @@ if let config = AIPostProcessingHelper.topSuggestion(for: photo, metadata: prope
   Warm Up, Cool Down, Clean Up and more fix problems. Vivid, Punch, Matte,
   Muted, Soft and others are styles, sized to each photo. [See every recipe](#the-recipes).
 - **Natural faces.** Every look keeps skin hue and saturation natural.
+- **Learns on the device.** Suggestions adapt to which looks the user picks
+  and how they adjust them, separately for each kind of photo. [How it works](#learning-from-saves).
 - **RAW aware.** Can match the camera's own rendering of a RAW and build the
   other looks on top of it.
 - **A full editor model.** `EditController` handles loading, live previews,
@@ -74,10 +77,17 @@ Each photo on the left, and on the right the edit the AI suggested for it.
 
 ## Requirements
 
-- iOS 17.6 or later
+- iOS 17.6 or later, or macOS 15 or later
 - Xcode with the Swift compiler this release was built with, or a newer one.
   The framework ships a module interface, so a newer compiler can read it; an
   older one can't.
+
+### On macOS
+
+The API is the same on both platforms; images are `PlatformImage`, which is
+`UIImage` on iOS and `NSImage` on macOS. `NSImage` applies a photo's EXIF
+orientation when it loads it, so hand it over as loaded. The examples below
+use `UIImage`; on a Mac read `NSImage` in its place.
 
 ## Installation
 
@@ -184,6 +194,7 @@ let gentler = EditConfig(properties: properties, crop: config.crop, editRotation
 | `.highlight` | −1 … 0 | negative recovers highlights |
 | `.saturation` | −1 … 1 | |
 | `.temperature` | −1 … 1 | positive is warmer |
+| `.tint` | −1 … 1 | positive is more magenta, negative greener |
 | `.shadowWarmth` | −1 … 1 | warms or cools the shadows only |
 | `.sharpness` | 0 … 2 | |
 | `.noiseReduction` | 0 … 1 | |
@@ -310,6 +321,42 @@ scene?.icon    // SF Symbol name
 The scenes are `people`, `animals`, `food`, `object`, `indoor`, `city`, `sky`,
 `nature` and `light`. It returns `nil` when the photo couldn't be classified.
 
+### Learning from saves
+
+Suggestions adapt to the person using your app. When a photo is exported with
+`EditController.renderForExport` after its suggestions were generated,
+PhotoEditKit records what happened: which looks were offered, which one was
+on the photo, and how far each slider was then moved from it. Later
+suggestions use those records in two ways:
+
+- **Order.** Looks the user picks move up the list. Looks shown above the one
+  they picked, and the top looks when they save with none, move down.
+- **Values.** If the user keeps adjusting a look the same way, for example
+  lowering Vivid's saturation, that look starts closer to where they leave it.
+
+Learning depends on the kind of photo. Each record is matched by how similar
+its photo is to the new one, using a summary of the analysis: brightness,
+contrast, colour, grain, faces and scene. Only close matches count, and
+nothing changes until there are a few of them. A habit on food photos doesn't
+change landscapes, and a change made after one look applies only to that
+look.
+
+What is learned stays small and inside the rules. A look can move a few
+places in the list, and each slider at most 15% of its range. Limits on grain,
+skin tone, clipping and minimum edit size still apply afterwards. A look's
+direction never flips: Cool Down can become neutral, but never warm.
+
+The records are used by `suggestions(for:)` and `topSuggestion(for:)`. Only
+`renderForExport` adds them, so an app that uses just the `AIPostProcessingHelper`
+calls gets the recipes unchanged.
+
+```swift
+AIPostProcessingHelper.learnedEditCount         // how many saves are recorded
+AIPostProcessingHelper.resetLearnedPreferences() // forget them all
+```
+
+Consider offering the reset in your settings screen.
+
 ## The recipes
 
 Each suggestion comes from one of a fixed set of recipes. The AI uses only
@@ -334,7 +381,7 @@ photo needs fixing, corrections come first.
 | Lift Shadows | Opens up dark areas without brightening the rest of the photo, including a subject that's dark against a bright sky or window. |
 | Warm Up | Takes a blue or cold colour cast back to neutral. |
 | Cool Down | Takes an orange or yellow colour cast back to neutral. |
-| True Color | For daylight photos where people and buildings in shade have turned blue and milky under a bright sky. Warms the shade and restores its contrast. |
+| True Color | For daylight photos where people and buildings in shade have turned blue and milky under a bright sky. Warms the shade and restores its contrast. Also takes a mild green or magenta tint off the photo's whites, such as a white object that reads lavender under mixed light. Strong tints, and tints at night, are left alone as part of the scene. |
 
 Warm Up and Cool Down correct a cast; they don't add one. A photo with
 balanced colour gets neither.
@@ -344,7 +391,7 @@ balanced colour gets neither.
 | Recipe | What it does |
 |---|---|
 | Crisp | Sharper detail with a little more contrast. |
-| Punch | Stronger contrast and clarity, with a moderate colour boost. Keeps the photo's warmth: it doesn't warm or cool it. |
+| Punch | Stronger contrast with a moderate colour boost. Keeps the photo's warmth: it doesn't warm or cool it. |
 | Pop | Brighter and punchier at once, for a light-coloured subject in a dim room, such as a glass of juice under a lamp. Not offered on photos with a lot of white. |
 | Vivid | Richer, more saturated colour, led by the colours the photo is about. |
 | Muted | Quieter colour overall, while the main subject keeps its own. Takes out more colour the more colourful the photo is. |
@@ -355,16 +402,19 @@ balanced colour gets neither.
 ### Every recipe
 
 - **Faces:** every recipe, corrections included, is adjusted so skin keeps a
-  natural hue and saturation, and a soft face is sharpened slightly (except in
-  Clean Up and Soft). Faces smaller than about 2% of the frame count for less.
+  natural hue and saturation. A clearly blurred face near the middle of the
+  frame is sharpened slightly (except in Clean Up and Soft); no other
+  sharpening is added unless the photo itself measures soft (Crisp). Faces
+  smaller than about 2% of the frame count for less.
 - **Subject and focus:** the AI works out where the subject is from faces,
   where the eye is drawn and what's in focus. Brighten judges exposure partly
   by the subject. On a photo with a shallow depth of field, Brighten, Lift
   Shadows and Recover Highlights judge mostly by the part in focus, so a
   blurred dark background or blown-out bokeh counts for little.
-- **Grain:** a recipe that would make grain more visible, such as a shadow
-  lift, adds noise reduction for it. A lift that the grain would make too
-  costly is cut back, or the recipe is dropped.
+- **Grain:** on a night or clearly overexposed photo, a recipe that would make
+  grain more visible, such as a shadow lift, adds noise reduction for it.
+  Noise reduction leaves fine texture (bark, fabric, hair) alone. A lift that
+  the grain would make too costly is cut back, or the recipe is dropped.
 - **Small edits are skipped:** a recipe that would barely change the photo isn't
   offered, so a good photo can get only a few suggestions.
 - **Similar looks are spread out:** when two suggestions would look nearly
@@ -399,7 +449,8 @@ nonisolated final class FileEditSource: EditSource, @unchecked Sendable {
     }
 
     // The full-resolution photo. A UIImage's imageOrientation is honoured, so
-    // you don't need to redraw a photo that carries an EXIF orientation.
+    // you don't need to redraw a photo that carries an EXIF orientation. On
+    // macOS, NSImage(data:) applies it already.
     @LogicActor func loadOriginal() async -> EditSourceImage? {
         UIImage(data: data).map { EditSourceImage(image: $0, isDevelopedRaw: false) }
     }
@@ -445,7 +496,7 @@ tied to the main actor:
 // On the main actor, e.g. in your view model
 let editor = EditController()
 
-// Show `editor.editedImage` (a preview-sized UIImage) in your UI. It's set by
+// Show `editor.editedImage` (a preview-sized UIImage, NSImage on macOS) in your UI. It's set by
 // the time `prepare` returns, and updates after every edit.
 // Observe `editor.aiProcessingState` for suggestions.
 
@@ -465,7 +516,7 @@ twice gives an exposure of 0.2.
 
 | Call | |
 |---|---|
-| `applySuggestion(_:)` | apply an AI suggestion; `nil` removes it. `appliedSuggestionID` tells you which one is on. See below for how it treats earlier edits |
+| `applySuggestion(_:automatic:)` | apply an AI suggestion; `nil` removes it. `appliedSuggestionID` tells you which one is on. Pass `automatic: true` when your app applied it rather than the user, e.g. opening on the top suggestion, so keeping it counts for less when [learning](#learning-from-saves). See below for how it treats earlier edits |
 | `previewConfig(_:)` | show a change while a slider is moving, without adding it to the history. Each call replaces the previous preview |
 | `confirmPreviewConfig()` | commit the previewed change when the slider is released |
 | `addConfig(_:)` | commit a change in one step |
@@ -523,6 +574,10 @@ if let rendered = await editor.renderForExport(config: config, editRotation: rot
 }
 editor.destroy()       // when the editing session ends
 ```
+
+`renderForExport` also records the edit for [learning](#learning-from-saves),
+if the photo's suggestions were generated. Calling it twice in one session,
+for example to save and then share, records it once.
 
 ## Exporting with HDR
 
@@ -584,8 +639,16 @@ Setting, recipe and scene names come back as `LocalizedStringResource`.
 ## Privacy
 
 PhotoEditKit makes no network requests and collects nothing. Photos, metadata
-and suggestions stay in your app's process. It doesn't download any models,
-so it works offline from the first launch.
+and suggestions stay on the device. It doesn't download any models, so it
+works offline from the first launch.
+
+The one thing it writes to disk is the record used for [learning from
+saves](#learning-from-saves): `Library/Application Support/PhotoEditKit/LearnedPreferences.json`
+in your app's container. It holds no photos or thumbnails, only the photo
+summary numbers, look names and slider values for at most the 500 latest
+saves (under 0.5 MB). It is included in device backups like the rest of your
+app's data. It is deleted with your app, or straight away by
+`resetLearnedPreferences()`.
 
 ## Support
 

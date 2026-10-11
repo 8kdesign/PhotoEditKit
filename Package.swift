@@ -5,15 +5,15 @@ import PackageDescription
 
 let package = Package(
     name: "PhotoEditKit",
-    platforms: [.iOS("17.6")],
+    platforms: [.iOS("17.6"), .macOS("15.0")],
     products: [
         .library(name: "PhotoEditKit", targets: ["PhotoEditKit"])
     ],
     targets: [
         .binaryTarget(
             name: "PhotoEditKit",
-            url: "https://github.com/8kdesign/PhotoEditKit/releases/download/1.0.8/PhotoEditKit.xcframework.zip",
-            checksum: "75946943ec4a795b400ec7829f5cfe31cf2cc34c14e566c61f6993f79b5d0e92"
+            url: "https://github.com/8kdesign/PhotoEditKit/releases/download/1.0.9/PhotoEditKit.xcframework.zip",
+            checksum: "d69c1a9449018b92e95819b301920c3bf1833a3c3e07117b7cdf4eb198efabf8"
         )
     ]
 )
