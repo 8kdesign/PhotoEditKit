@@ -74,6 +74,7 @@ Each photo on the left, and on the right the edit the AI suggested for it.
 | :---: | :---: |
 | <img src="Images/totem-original.jpg" width="320" alt="Carved pole against a grey sky, original"> | <img src="Images/totem-edited.jpg" width="320" alt="Carved pole against a grey sky, AI edit"> |
 | <img src="Images/red-panda-original.jpg" width="320" alt="Red panda in warm, hazy light, original"> | <img src="Images/red-panda-edited.jpg" width="320" alt="Red panda in warm, hazy light, AI edit"> |
+| <img src="Images/night-street-original.jpg" width="320" alt="City street at night under neon and street lights, original"> | <img src="Images/night-street-edited.jpg" width="320" alt="City street at night under neon and street lights, AI edit"> |
 
 ## Requirements
 
@@ -295,7 +296,10 @@ for suggestion in suggestions {
 }
 ```
 
-Returns up to ten suggestions, best first. Pass the photo at full resolution,
+Returns up to ten suggestions, best first. Pass `offerOriginal: true` to let
+the list lead with an **Original** suggestion (no edit) when no look improves
+on the photo as it is; it is off by default. With `EditController`, set
+`offersOriginalSuggestion` before `processAI()`. Pass the photo at full resolution,
 which is what the grain measurement needs; its `imageOrientation` is honoured.
 It took about 0.2 s on a 12 MP photo in the simulator; budget more on older
 devices. If the calling `Task` is
