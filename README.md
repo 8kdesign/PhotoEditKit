@@ -65,6 +65,7 @@ if let config = AIPostProcessingHelper.topSuggestion(for: photo, metadata: prope
 - [Localization](#localization)
 - [Privacy](#privacy)
 - [Support](#support)
+- [License](#license)
 
 ## Examples
 
@@ -662,3 +663,9 @@ edit, attach the photo (or a copy at around 1024 px) and say which suggestion
 looked wrong. Real photos are what the recipes are tuned on.
 
 If PhotoEditKit is useful in your app, a ⭐ helps other developers find it.
+
+## License
+
+PhotoEditKit is free to use, including in commercial apps. It ships as a
+binary and is not open source: you may not modify it, reverse engineer it, or
+sell or redistribute it on its own. See [LICENSE](LICENSE) for the full terms.

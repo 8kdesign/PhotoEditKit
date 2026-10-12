@@ -1,0 +1,94 @@
+PhotoEditKit License
+
+Copyright (c) 2026 LogicUI. All rights reserved.
+
+PhotoEditKit is distributed in binary form only. This license lets you use it,
+including commercially, free of charge. It does not make PhotoEditKit open
+source.
+
+1. Definitions
+
+   "Software" means the PhotoEditKit binary framework (including every
+   XCFramework slice, its bundled resources and machine-learning models), its
+   public interface files, and the documentation and example images that come
+   with it.
+
+   "You" means the individual or organisation using the Software.
+
+   "Your App" means an application, app extension, library or other product
+   that you build and that includes or links the Software.
+
+2. What you may do
+
+   Subject to the conditions in this license, LogicUI grants you a free,
+   worldwide, non-exclusive, non-transferable, revocable license to:
+
+   a. use the Software in Your App, for personal or commercial purposes;
+   b. distribute the Software, unmodified, as part of Your App, including in
+      apps you sell or that earn revenue in other ways; and
+   c. make copies of the Software as reasonably needed to develop, test and
+      distribute Your App.
+
+3. What you may not do
+
+   You may not, and may not allow anyone else to:
+
+   a. modify, adapt, patch or create derivative works of the Software;
+   b. decompile, disassemble or reverse engineer the Software, or try to
+      extract its source code, algorithms or machine-learning models, except
+      to the extent applicable law expressly allows this despite this
+      restriction;
+   c. sell, rent, lease, sublicense or otherwise charge for the Software
+      itself, on its own or as the main value of a product. Charging for Your
+      App is allowed, as long as Your App does more than repackage the
+      Software;
+   d. distribute the Software other than inside Your App, for example as a
+      standalone framework, a mirror of the package or part of a competing
+      photo-editing SDK or library;
+   e. extract the machine-learning models or other resources from the Software
+      and use them separately; or
+   f. remove or change any copyright notice or this license text where they
+      appear in the Software.
+
+4. Ownership
+
+   The Software is licensed, not sold. LogicUI keeps all rights, title and
+   interest in the Software, including all intellectual property rights. Any
+   rights not expressly granted in this license are reserved.
+
+5. Attribution
+
+   Attribution is appreciated but not required.
+
+6. Feedback
+
+   If you send LogicUI suggestions, bug reports or example photos, LogicUI may
+   use them to improve the Software without obligation to you.
+
+7. Termination
+
+   This license ends automatically if you break any of its terms. When it ends,
+   you must stop using and distributing the Software. Copies of Your App
+   already distributed to end users before then may continue to be used by
+   those end users.
+
+8. No warranty
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT.
+
+9. Limitation of liability
+
+   TO THE MAXIMUM EXTENT PERMITTED BY LAW, IN NO EVENT SHALL LOGICUI BE LIABLE
+   FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+   TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
+   OR THE USE OF OR OTHER DEALINGS IN THE SOFTWARE.
+
+10. Changes
+
+   LogicUI may publish new versions of this license with new releases of the
+   Software. Each release is covered by the license that comes with it.
+
+For permissions beyond this license, open an issue at
+https://github.com/8kdesign/PhotoEditKit/issues.
