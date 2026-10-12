@@ -76,6 +76,8 @@ Each photo on the left, and on the right the edit the AI suggested for it.
 | <img src="Images/totem-original.jpg" width="320" alt="Carved pole against a grey sky, original"> | <img src="Images/totem-edited.jpg" width="320" alt="Carved pole against a grey sky, AI edit"> |
 | <img src="Images/red-panda-original.jpg" width="320" alt="Red panda in warm, hazy light, original"> | <img src="Images/red-panda-edited.jpg" width="320" alt="Red panda in warm, hazy light, AI edit"> |
 | <img src="Images/night-street-original.jpg" width="320" alt="City street at night under neon and street lights, original"> | <img src="Images/night-street-edited.jpg" width="320" alt="City street at night under neon and street lights, AI edit"> |
+| <img src="Images/macaws-original.jpg" width="320" alt="Two macaws in a shaded tree, original"> | <img src="Images/macaws-edited.jpg" width="320" alt="Two macaws in a shaded tree, AI edit"> |
+| <img src="Images/lens-original.jpg" width="320" alt="Hand holding a phone with a lens against a bright curtain, original"> | <img src="Images/lens-edited.jpg" width="320" alt="Hand holding a phone with a lens against a bright curtain, AI edit"> |
 
 ## Requirements
 
