@@ -15,7 +15,7 @@ screen.
 
 | Original | AI edit |
 | :---: | :---: |
-| <img src="Images/forest-original.jpg" width="320" alt="Overcast forest, original"> | <img src="Images/forest-edited.jpg" width="320" alt="Overcast forest, AI edit"> |
+| <img src="Images/tablet-original.jpg" width="320" alt="Hand holding a green tablet against a bright curtain, original"> | <img src="Images/tablet-edited.jpg" width="320" alt="Hand holding a green tablet against a bright curtain, AI edit"> |
 | <img src="Images/valley-original.jpg" width="320" alt="Mountain valley, original"> | <img src="Images/valley-edited.jpg" width="320" alt="Mountain valley, AI edit"> |
 
 [More examples](#examples)
@@ -78,7 +78,7 @@ Each photo on the left, and on the right the edit the AI suggested for it.
 | <img src="Images/night-street-original.jpg" width="320" alt="City street at night under neon and street lights, original"> | <img src="Images/night-street-edited.jpg" width="320" alt="City street at night under neon and street lights, AI edit"> |
 | <img src="Images/macaws-original.jpg" width="320" alt="Two macaws in a shaded tree, original"> | <img src="Images/macaws-edited.jpg" width="320" alt="Two macaws in a shaded tree, AI edit"> |
 | <img src="Images/lens-original.jpg" width="320" alt="Hand holding a phone with a lens against a bright curtain, original"> | <img src="Images/lens-edited.jpg" width="320" alt="Hand holding a phone with a lens against a bright curtain, AI edit"> |
-| <img src="Images/tablet-original.jpg" width="320" alt="Hand holding a green tablet against a bright curtain, original"> | <img src="Images/tablet-edited.jpg" width="320" alt="Hand holding a green tablet against a bright curtain, AI edit"> |
+| <img src="Images/forest-original.jpg" width="320" alt="Overcast forest, original"> | <img src="Images/forest-edited.jpg" width="320" alt="Overcast forest, AI edit"> |
 
 ## Requirements
 
