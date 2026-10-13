@@ -78,6 +78,7 @@ Each photo on the left, and on the right the edit the AI suggested for it.
 | <img src="Images/night-street-original.jpg" width="320" alt="City street at night under neon and street lights, original"> | <img src="Images/night-street-edited.jpg" width="320" alt="City street at night under neon and street lights, AI edit"> |
 | <img src="Images/macaws-original.jpg" width="320" alt="Two macaws in a shaded tree, original"> | <img src="Images/macaws-edited.jpg" width="320" alt="Two macaws in a shaded tree, AI edit"> |
 | <img src="Images/lens-original.jpg" width="320" alt="Hand holding a phone with a lens against a bright curtain, original"> | <img src="Images/lens-edited.jpg" width="320" alt="Hand holding a phone with a lens against a bright curtain, AI edit"> |
+| <img src="Images/tablet-original.jpg" width="320" alt="Hand holding a green tablet against a bright curtain, original"> | <img src="Images/tablet-edited.jpg" width="320" alt="Hand holding a green tablet against a bright curtain, AI edit"> |
 
 ## Requirements
 
@@ -158,6 +159,14 @@ if let config = AIPostProcessingHelper.topSuggestion(for: small, metadata: prope
 have it: the exposure values in it are how the AI tells a photo that is dark
 on purpose (a night street, a lamp-lit room) from one that came out too dark.
 Without them, more night photos get brightened.
+
+For the same photo to get the same suggestions every time, give the AI the
+original file's properties, not those of a copy. Exports, screenshots and
+images saved from a canvas usually drop the EXIF. In testing, losing it changed
+the top suggestion on about 1 photo in 7, more than any other difference.
+Above about 2048 pixels on the long edge, the photo's size makes little
+difference to `suggestions(for:)`. Smaller copies read as less grainy, so they
+can get a different list.
 
 ## Edits: `EditConfig`
 
