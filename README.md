@@ -41,7 +41,7 @@ if let config = AIPostProcessingHelper.topSuggestion(for: photo, metadata: prope
   other looks on top of it.
 - **A full editor model.** `EditController` handles loading, live previews,
   undo/redo, crop, rotation, portrait blur and full-resolution export. You
-  build the UI.
+  build the UI; `MetalImageView` draws the live preview on the GPU.
 - **HDR kept.** Exports keep the iPhone's HDR gain map.
 - **Style matching.** Makes one photo's tones match a reference photo.
 - **Private by design.** No network requests, no models to download, no
@@ -523,6 +523,53 @@ Task { await editor.prepare(source: source) }
 `aiProcessingState` moves from `.pending` to `.loading` to
 `.done(result: [EditSuggestion])`, or to `.unavailable` when there are no
 suggestions to offer.
+
+#### Drawing the preview on the GPU with `MetalImageView`
+
+By default every slider tick renders the preview into a bitmap and publishes
+it as `editedImage`. That copies the whole preview from the GPU to the CPU and
+back on every frame. For smoother sliders, have the controller hand over the
+edit as an unrendered Core Image chain instead, and draw it with
+`MetalImageView`, a SwiftUI view that renders straight into the screen's
+drawable:
+
+```swift
+let editor = EditController()
+editor.rendersPreviewOnGPU = true         // set before `prepare`
+
+// In your SwiftUI view:
+@ObservedObject var editor: EditController
+
+var body: some View {
+    if let chain = editor.previewCIImage {
+        MetalImageView(image: chain)
+            .aspectRatio(chain.extent.size, contentMode: .fit)
+    } else if let image = editor.editedImage {
+        Image(uiImage: image).resizable().scaledToFit()
+    }
+}
+```
+
+- `previewCIImage` is the full preview, crop, rotation and vignette included,
+  and is published on every change. It's `nil` until the photo has loaded, and
+  always `nil` with `rendersPreviewOnGPU` off.
+- `editedImage` is still kept up to date for anything that needs a bitmap,
+  such as a crop screen or a share sheet, but only once edits pause for a
+  quarter of a second (and immediately for the first frame).
+- Size the view to the image's aspect ratio, as above. The image is fitted and
+  centred; anything left over is transparent.
+- For a view you zoom with a transform (`scaleEffect`), pass `detailScale` so
+  it draws at more than screen resolution: `MetalImageView(image: chain,
+  detailScale: zoom > 1 ? 4 : 1)`. It never draws past the image's own
+  pixels, so a large value means full resolution. iOS only; macOS ignores it.
+- Colour matches `editedImage` and the export: the view renders with the same
+  settings, into Display P3.
+- To show the original while a compare button is held, lay
+  `sourcePreviewImage` over the Metal view rather than removing it, so letting
+  go doesn't wait for a new view's first frame.
+
+It's a `UIViewRepresentable` (`NSViewRepresentable` on macOS). In UIKit, host
+it in a `UIHostingController`.
 
 ### 3. Edit
 
