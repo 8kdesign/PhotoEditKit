@@ -50,6 +50,7 @@ if let config = AIPostProcessingHelper.topSuggestion(for: photo, metadata: prope
 
 ## Contents
 
+- [How it fits into your app](#how-it-fits-into-your-app)
 - [Examples](#examples)
 - [Requirements](#requirements)
 - [Installation](#installation)
@@ -66,6 +67,70 @@ if let config = AIPostProcessingHelper.topSuggestion(for: photo, metadata: prope
 - [Privacy](#privacy)
 - [Support](#support)
 - [License](#license)
+
+## How it fits into your app
+
+PhotoEditKit does the image work. Your app supplies the photo, the screens
+and the saving. This is one editing session, call by call:
+
+```mermaid
+%%{init: {"themeVariables": {"actorBkg": "#0f766e", "actorBorder": "#0f766e", "actorTextColor": "#ffffff", "actorLineColor": "#14b8a6", "labelBoxBkgColor": "#0f766e", "labelBoxBorderColor": "#0f766e", "labelTextColor": "#ffffff", "loopTextColor": "#14b8a6", "activationBkgColor": "#ccfbf1", "activationBorderColor": "#0f766e"}}}%%
+sequenceDiagram
+    box rgba(80, 140, 220, 0.15) You build
+        participant UI as Your editing screen
+        participant Src as Your EditSource
+    end
+    box rgba(120, 120, 120, 0.15) PhotoEditKit provides
+        participant EC as EditController
+        participant E as Engine
+    end
+
+    UI->>EC: processAI()
+    Note right of UI: waits until the photo has loaded
+    UI->>+EC: prepare(source:)
+    EC->>Src: loadOriginal()
+    Src-->>EC: full-resolution image
+    EC-)E: start the AI pass on its own actor
+    E->>Src: loadMetadata()
+    Src-->>E: ImageIO properties (exposure, flash)
+    EC->>Src: loadPreview(maxDimension:), optional
+    EC->>E: render the first preview
+    EC-->>UI: editedImage
+    EC->>Src: loadDepth(), optional, for portrait blur
+    EC-->>-UI: prepare returns
+    Note left of E: ranks the looks, using what this<br>user picked on similar photos
+    E-->>EC: suggestions
+    EC-->>UI: aiProcessingState = .done(result:)<br>up to ten looks with titles and thumbnails
+
+    loop Every edit
+        UI->>EC: applySuggestion, previewConfig,<br>addConfig, undoConfig
+        EC->>E: re-render the preview
+        EC-->>UI: editedImage, or MetalImageView draws it
+    end
+
+    UI->>+EC: exportData(config:editRotation:type:quality:metadata:)
+    EC->>E: record the look and slider moves for learning
+    EC->>Src: loadFileData()
+    Src-->>EC: the encoded file
+    EC->>E: full resolution: edit, crop, rotation, vignette,<br>encoded with the file's HDR gain map and your metadata
+    E-->>EC: HEIC or JPEG data
+    EC-->>-UI: the file's data
+    Note right of UI: write the file, add it to Photos, share it
+    UI->>EC: destroy()
+```
+
+A RAW adds two more calls to your source: `loadRawExtras` while loading and
+`developRaw` while exporting.
+
+| You build | PhotoEditKit provides |
+|---|---|
+| An [`EditSource`](#1-provide-the-photo) that loads the photo from your library or files | Loading, the AI analysis and [suggestions](#ai-suggestions) with thumbnails |
+| The [editing screen](#3-edit): picker, sliders, buttons | [`EditController`](#building-an-editor-with-editcontroller): previews, undo/redo, crop, rotation, portrait blur, and [`MetalImageView`](#drawing-the-preview-on-the-gpu-with-metalimageview) to draw the preview |
+| [Saving](#4-export-and-finish): writing the file, adding it to Photos, sharing | The full-resolution render, encoded with the [HDR gain map](#exporting-with-hdr) and metadata, and [learning](#learning-from-saves) from each save |
+
+For a single automatic edit with no editing screen, skip `EditController`
+and `EditSource`: one `AIPostProcessingHelper` call and one render are enough.
+See the [quick start](#quick-start-let-the-ai-edit-a-photo).
 
 ## Examples
 
@@ -214,7 +279,7 @@ let gentler = EditConfig(properties: properties, crop: config.crop, editRotation
 | `.vignette` | −1 … 1 | |
 | `.boostRed` `.boostYellow` `.boostGreen` `.boostCyan` `.boostBlue` `.boostMagenta` | −1 … 1 | per-colour saturation |
 | `.rotation` | −45 … 45 | degrees, straightening |
-| `.depth` | 0 … 40 | background blur; needs depth data |
+| `.depth` | 0 … 40 | background blur ("Background Blur"); offer it only when `EditController.hasDepth` |
 
 `type.getSetting()` returns an `EditSetting` with the localized name, an SF
 Symbol and the range (`minValue`, `maxValue`), which is everything you need to
@@ -494,6 +559,25 @@ For a RAW, implement `isRaw`, `loadRawExtras` and `developRaw`; for depth
 is optional too: implement it if you can make a small copy more cheaply than
 shrinking the original, for example if you already have one on screen.
 
+A portrait photo keeps its depth beside the image in the file. Read it in
+`loadDepth`, turned upright by the orientation it was saved with:
+
+```swift
+@LogicActor func loadDepth() async -> (data: AVDepthData, orientation: Int32)? {
+    for type in [kCGImageAuxiliaryDataTypeDisparity, kCGImageAuxiliaryDataTypeDepth] {
+        guard let info = CGImageSourceCopyAuxiliaryDataInfoAtIndex(imageSource, 0, type) as? [String: Any],
+              let depth = try? AVDepthData(fromDictionaryRepresentation: info) else { continue }
+        let description = info[kCGImageAuxiliaryDataInfoDataDescription as String] as? [String: Any]
+        let saved = (description?["Orientation"] as? NSNumber)?.int32Value
+        return (depth, saved ?? Int32(orientation.rawValue))
+    }
+    return nil
+}
+```
+
+`defaultBlurRadius` is the blur the photo opens with. Leave it out (the default
+is 0) for the photo to open as it was taken, with the blur there to add.
+
 #### Actor isolation
 
 The editor calls your source from its own actors, so the source mustn't be
@@ -550,11 +634,12 @@ var body: some View {
 }
 ```
 
-- `previewCIImage` is the full preview, crop, rotation and vignette included,
-  and is published on every change. It's `nil` until the photo has loaded, and
-  always `nil` with `rendersPreviewOnGPU` off.
+- `previewCIImage` is the full preview, crop, straightening and vignette
+  included, and is published on every change. Quarter turns and flips are
+  left to your view; see [below](#quarter-turns-and-flips). It's `nil` until
+  the photo has loaded, and always `nil` with `rendersPreviewOnGPU` off.
 - `editedImage` is still kept up to date for anything that needs a bitmap,
-  such as a crop screen or a share sheet, but only once edits pause for a
+  such as a share sheet, but only once edits pause for a
   quarter of a second (and immediately for the first frame).
 - Size the view to the image's aspect ratio, as above. The image is fitted and
   centred; anything left over is transparent.
@@ -587,8 +672,66 @@ twice gives an exposure of 0.2.
 | `historyCount` | how many steps undo can go back. To stop undo at a point (e.g. right after a suggestion was applied), read it there and allow undo only while it's larger |
 | `hasEdits()` | whether anything has been changed |
 | `showOriginalImage` | a flag for your UI, e.g. while a "compare" button is held. The controller doesn't swap images itself: show `sourcePreviewImage` while it's `true` |
-| `currentConfig` | the edit as it stands |
-| `aspectRatio`, `editRotation` | crop ratio and quarter turns |
+| `currentConfig` | the edit as it stands. Read-only: change it through the calls above |
+| `setAspectRatio(_:)` | switch the crop ratio and crop the photo to it, as one step. `aspectRatio` reads the current one |
+| `editRotation` | the quarter turns and flip, read-only; see [below](#quarter-turns-and-flips) |
+| `hasDepth` | whether the photo has depth, so `.depth` (background blur) can be offered. Set once `prepare` has loaded it, just after the first preview |
+
+#### Cropping with `CropView`
+
+`CropView` is a ready-made crop screen that works the way the Photos app
+crops. Show it in place of the edited photo while the user crops or
+straightens, and switch back when they're done:
+
+```swift
+if isCropping {
+    CropView(editor: editor)
+} else {
+    // the edited photo, as in step 2
+}
+```
+
+- The crop sits centred and as large as the view allows, with the rest of
+  the photo dimmed around it. Around the photo, your own background shows.
+- Drag a corner or an edge to resize the crop; when the finger lifts, it
+  grows back to fill the view and zooms the photo with it. Drag inside to
+  move the photo under the crop, and pinch to zoom. On iOS, lifting one
+  finger of a pinch carries on as a move with the other.
+- It follows the edit as it is set elsewhere: the straightening (`.rotation`),
+  the quarter turns and flips, and the aspect ratio from `setAspectRatio(_:)`.
+  A resize keeps to that ratio.
+- Each gesture is previewed while it moves and committed as one undo step
+  when it ends, so undo and redo work as for a slider.
+- It draws `prerotatedImage`, the photo with its colour and tone edits but
+  before any cropping, so give it the room the edited photo had.
+
+#### Quarter turns and flips
+
+A quarter turn or a flip is a change like any other:
+
+```swift
+// Turn 90° clockwise, or flip left to right. Each tap turns or flips again.
+editor.addConfig(EditConfig(properties: [:], editRotation: .ninety, actionType: .fullRotation))
+editor.addConfig(EditConfig(properties: [:], editRotation: .originalFlip, actionType: .fullRotation))
+```
+
+The previews (`editedImage`, `previewCIImage`) leave them out, so the photo
+doesn't have to be rendered again when it turns: apply `editRotation` to the
+view that shows them. A turned photo's width and height swap, so lay it out at
+its turned size and rotate inside that:
+
+```swift
+let rotation = editor.editRotation
+let turns = rotation.isNeedSizeChange()
+photo
+    .frame(width: fitted.width, height: fitted.height)     // its own shape
+    .scaleEffect(x: rotation.isFlipped() ? -1 : 1, y: 1)
+    .rotationEffect(.degrees(rotation.getDegree()))
+    .frame(width: turns ? fitted.height : fitted.width,     // the turned shape
+           height: turns ? fitted.width : fitted.height)
+```
+
+`CropView` and the export apply them themselves.
 
 #### Suggestions replace earlier slider work
 
@@ -631,33 +774,48 @@ cancellable = editor.objectWillChange
 ```swift
 let config = editor.currentConfig
 let rotation = editor.editRotation
-if let rendered = await editor.renderForExport(config: config, editRotation: rotation) {
-    rendered.image     // full-resolution CGImage
-    rendered.gainMap   // HDR gain map, when the original had one
+let metadata = await source.loadMetadata()
+if let data = await editor.exportData(config: config, editRotation: rotation,
+                                      type: .heic, quality: 0.9, metadata: metadata) {
+    // A HEIC file with the original's HDR gain map and metadata.
+    // Write it out, add it to Photos or share it.
 }
 editor.destroy()       // when the editing session ends
 ```
 
-`renderForExport` also records the edit for [learning](#learning-from-saves),
-if the photo's suggestions were generated. Calling it twice in one session,
-for example to save and then share, records it once.
+`type` is `.jpeg` or `.heic`; the defaults are `.jpeg` at 0.95. The metadata
+is optional. When you pass it, it's corrected for the export: the photo is
+marked upright, and the original's pixel size and colour profile are dropped
+in favour of the new file's. Add your own tags, such as the TIFF software
+name, before you pass it.
+
+To encode the result yourself, call `renderForExport(config:editRotation:)`
+instead. It returns the full-resolution `CGImage` and the HDR gain map, when
+the original had one.
+
+Both record the edit for [learning](#learning-from-saves), if the photo's
+suggestions were generated. Calling them twice in one session, for example to
+save and then share, records it once.
 
 ## Exporting with HDR
 
-Photos taken on recent iPhones carry an HDR gain map. To keep it in an export,
-encode the image and the gain map together:
+Photos taken on recent iPhones carry an HDR gain map. `EditController.exportData`
+keeps it: the gain map is read from your source's `loadFileData()`, framed like
+the edit and attached to the encoded file. When there's no gain map, or
+attaching it fails, the image is encoded on its own, so you get a file either
+way.
+
+`HDRGainMap` is there for photos that don't go through `EditController`, or
+when you call `renderForExport` and encode the result yourself:
 
 ```swift
 let data = HDRGainMap.encode(rendered.image, gainMap: rendered.gainMap, type: .heic, quality: 0.9)
 ```
 
-When there's no gain map, or attaching it fails, the image is encoded on its
-own, so you get a file either way.
-
 If you then copy the data into a `CGImageDestination` to add metadata, call
 `HDRGainMap.copy(from:to:)` as well, because ImageIO leaves the gain map behind
-when it copies an image. `HDRGainMap.read(from:orientation:)` and
-`hasGainMap(_:)` read and detect gain maps.
+when it copies an image. `HDRGainMap.read(from:orientation:)` reads the gain
+map out of an image file.
 
 ## Matching a style
 
