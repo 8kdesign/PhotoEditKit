@@ -46,7 +46,7 @@ if let config = AIPostProcessingHelper.topSuggestion(for: photo, metadata: prope
 - **Style matching.** Makes one photo's tones match a reference photo.
 - **Private by design.** No network requests, no models to download, no
   account. Safe to use in app extensions.
-- **Localized** in English and Simplified Chinese.
+- **Localized** in English, Chinese and other languages.
 
 ## Contents
 
@@ -856,6 +856,12 @@ Setting, recipe and scene names come back as `LocalizedStringResource`.
 |---|---|
 | English | `en` |
 | Simplified Chinese | `zh-Hans` |
+| Traditional Chinese | `zh-Hant` |
+| Japanese | `ja` |
+| Korean | `ko` |
+
+iOS picks the framework's language to match your app's, so a language only
+shows up if your app is localized in it too.
 
 ## Privacy
 
