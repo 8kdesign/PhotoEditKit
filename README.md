@@ -20,6 +20,10 @@ screen.
 
 [More examples](#examples)
 
+To try it on a phone, [AutoEdit – Smart Photo Editor](https://apps.apple.com/sg/app/autoedit-smart-photo-editor/id6818664461) on the App Store
+is built on PhotoEditKit: pick a photo and it opens on the AI's best edit,
+with the other suggested looks one tap away.
+
 ```swift
 if let config = AIPostProcessingHelper.topSuggestion(for: photo, metadata: properties) {
     let edited = CIImage(cgImage: photo).applyingEditConfig(config)
@@ -390,6 +394,28 @@ rendering, and builds every other suggestion on top of it:
 let raw = AIPostProcessingHelper.RawContext(cameraReference: embeddedPreview, rawRecovery: nil)
 AIPostProcessingHelper.suggestions(for: develop, raw: raw, metadata: properties)
 ```
+
+### Faster first photo
+
+The first photo after launch is the slowest. The AI models have to load, and
+the GPU compiles each look's filters the first time it draws them. Call
+`prewarm()` when your app launches to do that while the user is still choosing
+a photo:
+
+```swift
+@main
+struct MyApp: App {
+    init() {
+        AIPostProcessingHelper.prewarm()
+    }
+    // …
+}
+```
+
+It returns at once and works in the background at low priority. Calling it
+again does nothing. If a photo is opened before it finishes, that photo's
+suggestions wait for one small step of it at most. On a Mac, the first 12 MP
+photo's suggestions took about 110 ms after `prewarm()` instead of 190–300 ms.
 
 ### Scene
 
