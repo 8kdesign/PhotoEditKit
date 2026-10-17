@@ -47,6 +47,8 @@ if let config = AIPostProcessingHelper.topSuggestion(for: photo, metadata: prope
   undo/redo, crop, rotation, portrait blur and full-resolution export. You
   build the UI; `MetalImageView` draws the live preview on the GPU.
 - **HDR kept.** Exports keep the iPhone's HDR gain map.
+- **Live Photos kept.** A Live Photo's movie is edited with the photo and
+  saved paired with it.
 - **Style matching.** Makes one photo's tones match a reference photo.
 - **Private by design.** No network requests, no models to download, no
   account. Safe to use in app extensions.
@@ -65,6 +67,7 @@ if let config = AIPostProcessingHelper.topSuggestion(for: photo, metadata: prope
 - [The recipes](#the-recipes)
 - [Building an editor with `EditController`](#building-an-editor-with-editcontroller)
 - [Exporting with HDR](#exporting-with-hdr)
+- [Keeping Live Photos live](#keeping-live-photos-live)
 - [Matching a style](#matching-a-style)
 - [Threading](#threading)
 - [Localization](#localization)
@@ -842,6 +845,56 @@ If you then copy the data into a `CGImageDestination` to add metadata, call
 `HDRGainMap.copy(from:to:)` as well, because ImageIO leaves the gain map behind
 when it copies an image. `HDRGainMap.read(from:orientation:)` reads the gain
 map out of an image file.
+
+## Keeping Live Photos live
+
+A Live Photo is a photo and a short movie that Photos pairs by an identifier
+both carry. Hand the movie to the editor through your source, and
+`EditController.exportLivePhoto` renders it again with the same edit (tone,
+colour, crop, straightening and quarter turns) and pairs it with the photo:
+
+```swift
+final class MySource: EditSource {
+    // ...
+    // The Live Photo's movie as a file, or nil for a still photo.
+    func loadPairedVideo() async -> URL? { movieURL }
+}
+
+guard let export = await editor.exportLivePhoto(config: config, editRotation: rotation,
+                                                type: .heic, quality: 0.9,
+                                                metadata: await source.loadMetadata()) else { return }
+let photoURL = /* write export.photo to a file */
+try await PHPhotoLibrary.shared().performChanges {
+    let request = PHAssetCreationRequest.forAsset()
+    request.addResource(with: .photo, fileURL: photoURL, options: nil)
+    if let video = export.video {
+        request.addResource(with: .pairedVideo, fileURL: video, options: nil)
+    }
+}
+// Then delete photoURL and export.video.
+```
+
+Give Photos both halves as **files**: it rejects a photo passed as `Data`
+together with a movie passed as a file. `export.video` is nil when the source
+has no movie, the movie couldn't be rendered, or the edit has a background blur
+(the movie has no depth to blur by). The photo then comes without a pairing
+identifier, so it saves as an ordinary photo. Every export strips the
+original's identifier, because Photos rejects a photo that names a movie it
+isn't saved with.
+
+To get the movie from a `PhotosPickerItem` without asking for library access,
+load it as a `PHLivePhoto` and copy out its `.pairedVideo` resource with
+`PHAssetResourceManager`. Don't check the item's content types first: with the
+current encoding, a Live Photo can list only its still's type.
+
+If you encode the photo yourself, call `exportLivePhotoVideo(from:config:editRotation:identifier:)`
+for the movie and put the same identifier in the photo's metadata with
+`LivePhoto.metadata(_:pairedWith:)`. If Photos still refuses the pair,
+`LivePhoto.removingPairing(from:)` gives you the photo without its identifier,
+so you can save it on its own.
+
+The movie is written as SDR HEVC at the edited frame size. An HDR Live Photo's
+movie loses its HDR.
 
 ## Matching a style
 

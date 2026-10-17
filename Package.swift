@@ -12,8 +12,8 @@ let package = Package(
     targets: [
         .binaryTarget(
             name: "PhotoEditKit",
-            url: "https://github.com/8kdesign/PhotoEditKit/releases/download/1.1.6/PhotoEditKit.xcframework.zip",
-            checksum: "6ff8e23c7b05f7414a29b3cfc1a9ab1f8a8e0f492ba838973c0f80b6d626d1e3"
+            url: "https://github.com/8kdesign/PhotoEditKit/releases/download/1.1.7/PhotoEditKit.xcframework.zip",
+            checksum: "39bf04399d70f0f84bc7e40232d68259a6c5eee207febe492d99405885780a4a"
         )
     ]
 )
