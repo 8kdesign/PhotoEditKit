@@ -32,7 +32,8 @@ if let config = AIPostProcessingHelper.topSuggestion(for: photo, metadata: prope
 
 ## Features
 
-- **AI edit suggestions.** Up to ten ranked looks per photo, each with a
+- **AI edit suggestions.** Up to ten ranked looks per photo (you can set the
+  limit), each with a
   title and a thumbnail, or a single best edit. A photo that's already good
   gets `nil` rather than a style it didn't ask for.
 - **Corrections and styles.** Brighten, Lift Shadows, Recover Highlights,
@@ -107,7 +108,7 @@ sequenceDiagram
     EC-->>-UI: prepare returns
     Note left of E: ranks the looks, using what this<br>user picked on similar photos
     E-->>EC: suggestions
-    EC-->>UI: aiProcessingState = .done(result:)<br>up to ten looks with titles and thumbnails
+    EC-->>UI: aiProcessingState = .done(result:)<br>up to ten looks (maxSuggestions) with titles and thumbnails
 
     loop Every edit
         UI->>EC: applySuggestion, previewConfig,<br>addConfig, undoConfig
@@ -281,7 +282,7 @@ let gentler = EditConfig(properties: properties, crop: config.crop, editRotation
 | `.temperature` | −1 … 1 | positive is warmer |
 | `.tint` | −1 … 1 | positive is more magenta, negative greener |
 | `.shadowWarmth` | −1 … 1 | warms or cools the shadows only |
-| `.sharpness` | 0 … 2 | |
+| `.sharpness` | −1 … 1 | positive sharpens; negative flattens fine detail into painted patches |
 | `.noiseReduction` | 0 … 1 | |
 | `.vignette` | −1 … 1 | |
 | `.boostRed` `.boostYellow` `.boostGreen` `.boostCyan` `.boostBlue` `.boostMagenta` | −1 … 1 | per-colour saturation |
@@ -380,10 +381,19 @@ for suggestion in suggestions {
 }
 ```
 
-Returns up to ten suggestions, best first. Pass `offerOriginal: true` to let
+Returns up to ten suggestions, best first; pass `maxSuggestions:` for another
+limit (at least 1; `EditController.maxSuggestions` with the controller). A
+smaller limit keeps the best of the same list, in the same order. Pass `offerOriginal: true` to let
 the list lead with an **Original** suggestion (no edit) when no look improves
 on the photo as it is; it is off by default. With `EditController`, set
-`offersOriginalSuggestion` before `processAI()`. Pass the photo at full resolution,
+`offersOriginalSuggestion` before `processAI()`. Pass `includeThemes: true` to
+also get [themes](#themes) that suit the photo; they come after the other
+suggestions, outside the limit, with `isTheme` set, and never change which other
+suggestions are offered or their order. Off by default; with `EditController`,
+set `offersThemeSuggestions`. Pass `disabledLooks:` (a set of `AILook`, such
+as `[.trueColor]`) to leave looks out; the next best take their place. With
+`EditController`, set `disabledLooks`; `topSuggestion(for:metadata:disabledLooks:)`
+takes it too. Pass the photo at full resolution,
 which is what the grain measurement needs; its `imageOrientation` is honoured.
 It took about 0.2 s on a 12 MP photo in the simulator; budget more on older
 devices. If the calling `Task` is
@@ -508,6 +518,16 @@ balanced colour gets neither.
 | Matte | A faded, film-print style: softened blacks, gentler colour and a light vignette. Fades more on a contrasty photo, less on a flat one. |
 | Soft | A gentle, warm finish with low contrast. |
 | Spotlight | Darkens the edges to draw the eye to the middle of the photo. Leaves colour alone. |
+
+### Themes
+
+Themes restyle a photo as something else rather than improve it. They are only
+offered with `includeThemes: true`, always after the corrections and styles.
+
+| Theme | What it does |
+|---|---|
+| Manga | A hand-painted anime look: bright, open shadows, soft highlights, clean sky blues and leaf greens, and fine detail flattened into painted patches (negative `.sharpness`). City, nature and sky photos in daylight only, not sunsets or night. |
+| B&W | Black and white, with contrast, highlights and shadows set for the photo; a warm sunset sky is darkened as a blue filter does on film (`EditSettingType.monochromeFilter`, no slider of its own). Only offered on photos with strong contrast. |
 
 ### Every recipe
 
