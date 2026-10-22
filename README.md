@@ -285,7 +285,9 @@ let gentler = EditConfig(properties: properties, crop: config.crop, editRotation
 | `.sharpness` | −1 … 1 | positive sharpens; negative flattens fine detail into painted patches |
 | `.noiseReduction` | 0 … 1 | |
 | `.vignette` | −1 … 1 | |
-| `.boostRed` `.boostYellow` `.boostGreen` `.boostCyan` `.boostBlue` `.boostMagenta` | −1 … 1 | per-colour saturation |
+| `.boostRed` `.boostOrange` `.boostYellow` `.boostGreen` `.boostCyan` `.boostBlue` `.boostPurple` `.boostMagenta` | −1 … 1 | colour mixer: saturation of one colour band |
+| `.hueRed` … `.hueMagenta` (same eight bands) | −1 … 1 | colour mixer: turns a band's colours toward its neighbours; positive goes on round the wheel (red toward orange, blue toward purple) |
+| `.luminanceRed` … `.luminanceMagenta` (same eight bands) | −1 … 1 | colour mixer: lightens or darkens a band's colours, leaving greys alone |
 | `.rotation` | −45 … 45 | degrees, straightening |
 | `.depth` | 0 … 40 | background blur ("Background Blur"); offer it only when `EditController.hasDepth` |
 
@@ -304,8 +306,12 @@ let current = editor.currentConfig.value(of: .saturation)       // e.g. 0.2
 editor.addConfig(saturation.getEditConfig(0.1))                  // now 0.3
 ```
 
-`availableEditSettings`, `colorBoostSettings` and `rotationSettings` list the
-settings in display order.
+`availableEditSettings`, `colorMixerSettings` and `rotationSettings` list the
+settings in display order. The colour mixer has hue, saturation and luminance
+for each of eight bands (`ColorBand`): `colorMixerSettings(.hue)` lists one
+channel, and `band.setting(.luminance)` gives one band's slider. Every
+setting is a slider: there are no hidden settings a suggestion can carry that
+your editor can't show.
 
 Crop is `config.crop`, a rect in normalized coordinates, where `(0, 0, 1, 1)` is
 the whole image. Quarter turns and flips are `config.editRotation` (`EditRotation`).
@@ -501,7 +507,7 @@ photo needs fixing, corrections come first.
 | Lift Shadows | Opens up dark areas without brightening the rest of the photo, including a subject that's dark against a bright sky or window. |
 | Warm Up | Takes a blue or cold colour cast back to neutral. |
 | Cool Down | Takes an orange or yellow colour cast back to neutral. |
-| True Color | For daylight photos where people and buildings in shade have turned blue and milky under a bright sky. Warms the shade and restores its contrast. Also takes a mild green or magenta tint off the photo's whites, such as a white object that reads lavender under mixed light. Strong tints, and tints at night, are left alone as part of the scene. |
+| True Color | For daylight photos where people and buildings in shade have turned blue and milky under a bright sky. Warms the shade and restores its contrast. Also takes the edge off a strong warm cast without making the photo cold, and takes a mild green or magenta tint off the photo's whites, such as a white object that reads lavender under mixed light. Strong tints, and tints at night, are left alone as part of the scene. Puts back what the correction itself disturbs: warm colours keep their hue as a warm cast comes out, a warmed sky stays blue, leaves keep their light, and a face that ends up too pink, too yellow or too red is brought back to natural skin. |
 
 Warm Up and Cool Down correct a cast; they don't add one. A photo with
 balanced colour gets neither.
@@ -511,9 +517,9 @@ balanced colour gets neither.
 | Recipe | What it does |
 |---|---|
 | Crisp | Sharper detail with a little more contrast. |
-| Punch | Stronger contrast with a moderate colour boost. Keeps the photo's warmth: it doesn't warm or cool it. |
-| Pop | Brighter and punchier at once, for a light-coloured subject in a dim room, such as a glass of juice under a lamp. Not offered on photos with a lot of white. |
-| Vivid | Richer, more saturated colour, led by the colours the photo is about. |
+| Punch | Stronger contrast with a moderate colour boost. Keeps the photo's warmth: it doesn't warm or cool it. Deepens a daylight blue sky. |
+| Pop | Brighter and punchier at once, for a light-coloured subject in a dim room, such as a glass of juice under a lamp. The subject's own colours are lifted further than the rest of the photo. Not offered on photos with a lot of white. |
+| Vivid | Richer, more saturated colour, led by the colours the photo is about. Deepens a daylight blue sky rather than oversaturating it, and turns the yellowish greens of sunlit leaves toward true green. |
 | Muted | Quieter colour overall, while the main subject keeps its own. Takes out more colour the more colourful the photo is. |
 | Matte | A faded, film-print style: softened blacks, gentler colour and a light vignette. Fades more on a contrasty photo, less on a flat one. |
 | Soft | A gentle, warm finish with low contrast. |
@@ -526,13 +532,16 @@ offered with `includeThemes: true`, always after the corrections and styles.
 
 | Theme | What it does |
 |---|---|
-| Manga | A hand-painted anime look: bright, open shadows, soft highlights, clean sky blues and leaf greens, and fine detail flattened into painted patches (negative `.sharpness`). City, nature and sky photos in daylight only, not sunsets or night. |
-| B&W | Black and white, with contrast, highlights and shadows set for the photo; a warm sunset sky is darkened as a blue filter does on film (`EditSettingType.monochromeFilter`, no slider of its own). Only offered on photos with strong contrast. |
+| Manga | A hand-painted anime look: bright, open shadows, soft highlights, light cyan anime skies and clean leaf greens, and fine detail flattened into painted patches (negative `.sharpness`). The sky turns less cyan when hazy blue mountains or water share its colour. City, nature and sky photos in daylight only, not sunsets or night. |
+| B&W | Black and white, with contrast, highlights and shadows set for the photo; a warm sunset sky is darkened as a blue filter does on film, through the colour mixer's luminance. Only offered on photos with strong contrast, or a city lit up at night. |
+| Film | A print from colour negative film: muted colour (greens most of all, turned toward olive, and blues toward teal), strong contrast that follows the photo's own light, highlights rolled off, a little warmth and green tint, and a very subtle vignette. Slightly darker than the photo, but eases off on faces and on a subject that is already dark. Not offered on night or dark photos. |
 
 ### Every recipe
 
 - **Faces:** every recipe, corrections included, is adjusted so skin keeps a
-  natural hue and saturation. A clearly blurred face near the middle of the
+  natural hue and saturation, and faces are brightened slightly without
+  brightening the rest of the photo. A face lit by coloured light from
+  different sides, as on a stage, is left as lit. A clearly blurred face near the middle of the
   frame is sharpened slightly (except in Clean Up and Soft); no other
   sharpening is added unless the photo itself measures soft (Crisp). Faces
   smaller than about 2% of the frame count for less.
