@@ -50,6 +50,10 @@ if let config = AIPostProcessingHelper.topSuggestion(for: photo, metadata: prope
 - **HDR kept.** Exports keep the iPhone's HDR gain map.
 - **Live Photos kept.** A Live Photo's movie is edited with the photo and
   saved paired with it.
+- **Videos.** The AI picks looks for a video's first frame, then builds the
+  chosen look again for each scene, so a darker or warmer scene gets it as it
+  suits that scene. A preview player shows the edit on every frame, and look
+  changes appear on the next frame. [Editing videos](#editing-videos).
 - **Style matching.** Makes one photo's tones match a reference photo.
 - **Private by design.** No network requests, no models to download, no
   account. Safe to use in app extensions.
@@ -69,6 +73,7 @@ if let config = AIPostProcessingHelper.topSuggestion(for: photo, metadata: prope
 - [Building an editor with `EditController`](#building-an-editor-with-editcontroller)
 - [Exporting with HDR](#exporting-with-hdr)
 - [Keeping Live Photos live](#keeping-live-photos-live)
+- [Editing videos](#editing-videos)
 - [Matching a style](#matching-a-style)
 - [Threading](#threading)
 - [Localization](#localization)
@@ -925,6 +930,149 @@ so you can save it on its own.
 The movie is written as SDR HEVC at the edited frame size. An HDR Live Photo's
 movie loses its HDR.
 
+## Editing videos
+
+A video is edited through its first frame. `EditController` offers the looks
+for that frame and the user adjusts it like a photo. `VideoEdit` then carries
+the edit through the whole video: it finds where the scenes change and builds
+the picked look again for each scene, fading from one to the next. The user's
+own adjustments stay as they made them on every frame.
+
+### 1. Open the video
+
+```swift
+guard let source = await VideoEditSource.open(movie: movieURL) else { return }  // nil: no picture
+
+let editor = EditController()
+editor.configureForVideo()                // before processAI()
+editor.rendersPreviewOnGPU = true
+editor.processAI()
+Task { await editor.prepare(source: source) }
+
+let video = VideoEdit(source: source)
+video.start { [weak self] in self?.appliedSuggestion }
+```
+
+`VideoEditSource` reads the movie where it is and never deletes it; use a
+file you keep for the whole session. `configureForVideo()` leaves sharpening
+and noise reduction out (each frame would be changed differently and the
+video would shimmer), drops the looks built on them (Crisp, Manga and
+Clean Up), and has the AI read the frame for how dim the scene was, since a
+video frame has no exposure metadata. Hide the sharpening and noise reduction
+controls too: `VideoLook.excludedSettings` lists them.
+
+`start` reads the whole video once in the background to find the scene
+changes. The closure returns the suggestion applied when that finishes. Here
+`appliedSuggestion` is your own lookup:
+
+```swift
+var appliedSuggestion: EditSuggestion? {
+    guard case .done(let suggestions) = editor.aiProcessingState else { return nil }
+    return suggestions.first { $0.id == editor.appliedSuggestionID }
+}
+```
+
+Whenever the applied suggestion changes, call `video.match(appliedSuggestion)`
+so the new look is worked out for the other scenes. Looks already worked out
+are kept.
+
+### 2. Preview it
+
+`VideoPreviewPlayer` plays the video with the edit on every frame, and
+`VideoPreviewSurface` shows it:
+
+```swift
+@StateObject private var preview = VideoPreviewPlayer()
+@Environment(\.displayScale) private var displayScale
+
+var body: some View {
+    GeometryReader { proxy in
+        VideoPreviewSurface(player: preview)
+            .aspectRatio(preview.size, contentMode: .fit)
+            .frame(width: proxy.size.width, height: proxy.size.height)
+            // Frames are decoded and edited at the size they're shown.
+            .onChange(of: proxy.size, initial: true) { _, size in
+                preview.maxPixelSize = CGSize(width: size.width * displayScale, height: size.height * displayScale)
+            }
+    }
+    .overlay(alignment: .bottom) { Scrubber(preview: preview, position: preview.position) }
+    .task { await preview.load(source.asset, look: currentLook) }
+    .onChange(of: editor.currentConfig) { preview.update(look: currentLook, showsOriginal: false) }
+    .onChange(of: editor.appliedSuggestionID) { preview.update(look: currentLook, showsOriginal: false) }
+    .onChange(of: video.revision) { preview.update(look: currentLook, showsOriginal: false) }
+    .onDisappear { preview.stop() }
+}
+
+var currentLook: VideoLook {
+    video.look(for: appliedSuggestion, edit: editor.currentConfig)
+}
+
+// Watches only the position, so only it updates as the video plays.
+struct Scrubber: View {
+    let preview: VideoPreviewPlayer
+    @ObservedObject var position: VideoPreviewPosition
+    var body: some View {
+        Slider(value: Binding(get: { position.seconds }, set: { preview.scrub(to: $0) }),
+               in: 0 ... max(preview.duration, 0.01)) { preview.isScrubbing = $0 }
+    }
+}
+```
+
+- The player draws each frame into the surface itself, off the main thread,
+  and puts it on screen at the moment it's due. Nothing in your view updates
+  as the video plays. Only a view that observes `position` updates, about
+  30 times a second.
+- It opens paused on the first frame. `play()`, `pause()`, `togglePlaying()`,
+  and `scrub(to:)` control it; `isPlaying` and `duration` are published for
+  your controls, and `position.seconds` for a scrubber. Set `isScrubbing` for
+  the length of a slider drag. It loops at the end.
+- `size` has the edited frame's shape as soon as `load` has read the video,
+  before the first frame is drawn, so the view doesn't jump.
+- `update(look:showsOriginal:)` redraws the frame on screen straight away,
+  playing or paused. Pass `showsOriginal: true` to compare with the
+  unedited video, framed as the edit is.
+- `video.revision` changes when a look has been worked out for the rest of
+  the video. Until then, `look(for:edit:)` gives the first frame's edit
+  throughout.
+- Set `maxPixelSize` to the view's size in pixels. The video is then decoded
+  at about that size, which is much cheaper for a 4K video. Leave it nil to
+  decode and edit at full size.
+- Frames are shown in SDR, as they are exported. An HDR video is tone-mapped.
+- `isMuted` (or `toggleMuted()`) silences the sound; `hasAudio` says whether
+  there is any, so a mute button can stand aside. Set `isMuted = true` before
+  `load` to open a video silent.
+- On iOS, playing with the sound on switches the app to the playback audio
+  session, so the sound plays with the ring switch on silent, and `stop()`
+  hands it back. A muted video leaves the session alone, so other apps'
+  audio carries on; unmuting while it plays switches then. Set
+  `managesAudioSession = false` to handle the session yourself.
+
+### 3. Export
+
+```swift
+let look = await video.finishedLook(for: appliedSuggestion, edit: editor.currentConfig)
+guard let rendered = await editor.exportVideo(from: source.movie, look: look) else { return }
+try await PHPhotoLibrary.shared().performChanges {
+    PHAssetCreationRequest.forAsset().addResource(with: .video, fileURL: rendered, options: nil)
+}
+// Then delete `rendered`.
+video.close()          // and editor.destroy(), when the session ends
+```
+
+`finishedLook` waits until the look has been worked out for every scene.
+The export is a temporary QuickTime file in SDR HEVC (Rec. 709), at the
+edited frame size, with the video's sound and its date and location
+metadata. Saving a video doesn't [teach](#learning-from-saves) the
+suggestions; only photo saves do.
+
+To render frames in your own pipeline instead, call
+`EditController.editedMovieFrame(_:config:editRotation:)` with
+`look.config(at: time)` for each frame. Render the result with a
+`CIContext` whose working colour space is extended sRGB, the space the
+filters were tuned in. A context in linear light, such as the one an
+`AVVideoComposition` uses unless you pass your own, makes contrast pivot on
+a far darker grey and crushes shadows to black.
+
 ## Matching a style
 
 `StyleMatcher` makes one photo's tones match a reference photo, or the average
@@ -949,7 +1097,8 @@ Calls are marked with the actor they run on, and can be awaited from anywhere:
   (`EditController.prepare`, `renderForExport`, `PostProcessingHelper`
   geometry, `StyleMatcher`, and your `EditSource`'s `loadOriginal`).
 - `MainActor` for everything on `EditController` that changes the edit
-  (`addConfig`, `applySuggestion`, `undoConfig`, …).
+  (`addConfig`, `applySuggestion`, `undoConfig`, …), and for `VideoEdit` and
+  `VideoPreviewPlayer`. `exportVideo` runs on `LogicActor`.
 
 `EditController` runs its AI suggestions on a background actor of its own.
 
