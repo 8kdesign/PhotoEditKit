@@ -52,8 +52,9 @@ if let config = AIPostProcessingHelper.topSuggestion(for: photo, metadata: prope
   saved paired with it.
 - **Videos.** The AI picks looks for a video's first frame, then builds the
   chosen look again for each scene, so a darker or warmer scene gets it as it
-  suits that scene. A preview player shows the edit on every frame, and look
-  changes appear on the next frame. [Editing videos](#editing-videos).
+  suits that scene. The user can also change the edit at any scene change.
+  A preview player shows the edit on every frame, and look changes appear on
+  the next frame. [Editing videos](#editing-videos).
 - **Style matching.** Makes one photo's tones match a reference photo.
 - **Private by design.** No network requests, no models to download, no
   account. Safe to use in app extensions.
@@ -192,6 +193,9 @@ To declare the dependency in your own `Package.swift`:
 .package(url: "https://github.com/8kdesign/PhotoEditKit", from: "1.0.0")
 ```
 
+Moving up from an earlier version? [UPGRADING.md](UPGRADING.md) lists what
+to change in your app for each release.
+
 ### Manual
 
 1. Download `PhotoEditKit.xcframework.zip` from the
@@ -279,11 +283,12 @@ let gentler = EditConfig(properties: properties, crop: config.crop, editRotation
 | `EditSettingType` | Range | |
 |---|---|---|
 | `.exposure` | −0.5 … 0.5 | |
-| `.brightness` | −0.5 … 0.5 | |
+| `.brightness` | −0.5 … 0.5 | moves the midtones; black and white stay where they are |
 | `.contrast` | −0.5 … 0.5 | |
 | `.shadow` | −1 … 1 | positive lifts shadows |
 | `.highlight` | −1 … 0 | negative recovers highlights |
 | `.saturation` | −1 … 1 | |
+| `.vibrance` | −1 … 1 | saturation that goes mostly to muted colours, spares skin, and leaves greys and already-vivid colours nearly alone |
 | `.temperature` | −1 … 1 | positive is warmer |
 | `.tint` | −1 … 1 | positive is more magenta, negative greener |
 | `.shadowWarmth` | −1 … 1 | warms or cools the shadows only |
@@ -332,6 +337,12 @@ not crop or rotation:
 ```swift
 let output: CIImage = input.applyingEditConfig(config)
 ```
+
+Settings always render in the same order, whatever order they were set in:
+noise reduction (and negative sharpness's smoothing) first, then white
+balance (temperature, tint), exposure, shadows and highlights, brightness,
+contrast, shadow warmth, the colour mixer, vibrance and saturation, then
+sharpening, and the vignette last.
 
 When you're rendering a preview that is smaller than the photo, pass
 `renderScale` (preview size ÷ full size). Sharpening and noise reduction work
@@ -438,8 +449,9 @@ struct MyApp: App {
 
 It returns at once and works in the background at low priority. Calling it
 again does nothing. If a photo is opened before it finishes, that photo's
-suggestions wait for one small step of it at most. On a Mac, the first 12 MP
-photo's suggestions took about 110 ms after `prewarm()` instead of 190–300 ms.
+suggestions wait for one small step of it at most. On an iPhone 17, with
+`prewarm()` at launch, the first photo's suggestions take about 0.3 s, as
+later ones do.
 
 ### Scene
 
@@ -506,13 +518,13 @@ photo needs fixing, corrections come first.
 | Original | RAW photos only. Matches the camera's own rendering of the RAW, which is usually livelier than a plain develop. Every other recipe on a RAW starts from it. |
 | Clean Up | Reduces grain and noise, and leaves tone and colour alone. |
 | Balance Light | RAW photos only. Opens up the shadows and brings back the highlights together, for backlit or high-contrast scenes. |
-| Brighten | Lifts a photo that came out too dark. |
+| Brighten | Lifts a photo that came out too dark. The subject's own colours are lifted a little further than the rest, through the colour mixer's luminance. |
 | Deepen | The opposite of Brighten: richer blacks and more contrast for a photo that looks grey or washed out, without lightening it. |
 | Recover Highlights | Brings back detail in bright areas such as a sky. Ranks lower when what's blown out is away from the subject, such as a white border or a lit window, since a JPEG has no detail left there to bring back. A RAW that still holds the detail keeps its place. |
-| Lift Shadows | Opens up dark areas without brightening the rest of the photo, including a subject that's dark against a bright sky or window. |
+| Lift Shadows | Opens up dark areas without brightening the rest of the photo, including a subject that's dark against a bright sky or window, such as a hand held up against a sunlit curtain. |
 | Warm Up | Takes a blue or cold colour cast back to neutral. |
 | Cool Down | Takes an orange or yellow colour cast back to neutral. |
-| True Color | For daylight photos where people and buildings in shade have turned blue and milky under a bright sky. Warms the shade and restores its contrast. Also takes the edge off a strong warm cast without making the photo cold, and takes a mild green or magenta tint off the photo's whites, such as a white object that reads lavender under mixed light. Strong tints, and tints at night, are left alone as part of the scene. Puts back what the correction itself disturbs: warm colours keep their hue as a warm cast comes out, a warmed sky stays blue, leaves keep their light, and a face that ends up too pink, too yellow or too red is brought back to natural skin. |
+| True Color | For daylight photos where people and buildings in shade have turned blue and milky under a bright sky. Warms the shade and restores its contrast. Also takes the edge off a strong warm cast without making the photo cold, and takes a mild green or magenta tint off the photo's whites, such as a white object that reads lavender under mixed light. A pale coloured subject, such as a lavender ice cream in focus, isn't mistaken for a tinted white, and a backlit screen or poster in the frame doesn't count against a warm cast in the room. Strong tints, and tints at night, are left alone as part of the scene. Puts back what the correction itself disturbs: warm colours keep their hue as a warm cast comes out, a warmed sky stays blue, leaves keep their light, and a face that ends up too pink, too yellow or too red is brought back to natural skin. |
 
 Warm Up and Cool Down correct a cast; they don't add one. A photo with
 balanced colour gets neither.
@@ -524,7 +536,7 @@ balanced colour gets neither.
 | Crisp | Sharper detail with a little more contrast. |
 | Punch | Stronger contrast with a moderate colour boost. Keeps the photo's warmth: it doesn't warm or cool it. Deepens a daylight blue sky. |
 | Pop | Brighter and punchier at once, for a light-coloured subject in a dim room, such as a glass of juice under a lamp. The subject's own colours are lifted further than the rest of the photo. Not offered on photos with a lot of white. |
-| Vivid | Richer, more saturated colour, led by the colours the photo is about. Deepens a daylight blue sky rather than oversaturating it, and turns the yellowish greens of sunlit leaves toward true green. |
+| Vivid | Richer, more saturated colour, led by the colours the photo is about. Uses vibrance for much of it, so muted colours gain the most while skin and colours that are already strong are left nearly as they were; on photos of people it uses vibrance alone. Deepens a daylight blue sky rather than oversaturating it, and turns the yellowish greens of sunlit leaves toward true green. |
 | Muted | Quieter colour overall, while the main subject keeps its own. Takes out more colour the more colourful the photo is. |
 | Matte | A faded, film-print style: softened blacks, gentler colour and a light vignette. Fades more on a contrasty photo, less on a flat one. |
 | Soft | A gentle, warm finish with low contrast. |
@@ -551,7 +563,9 @@ offered with `includeThemes: true`, always after the corrections and styles.
   sharpening is added unless the photo itself measures soft (Crisp). Faces
   smaller than about 2% of the frame count for less.
 - **Subject and focus:** the AI works out where the subject is from faces,
-  where the eye is drawn and what's in focus. Brighten judges exposure partly
+  where the eye is drawn and what's in focus. It also finds hands, so a hand
+  held up dark against a bright background is lifted even when it is too
+  thin to stand out on its own. Brighten judges exposure partly
   by the subject. On a photo with a shallow depth of field, Brighten, Lift
   Shadows and Recover Highlights judge mostly by the part in focus, so a
   blurred dark background or blown-out bokeh counts for little.
@@ -936,7 +950,9 @@ A video is edited through its first frame. `EditController` offers the looks
 for that frame and the user adjusts it like a photo. `VideoEdit` then carries
 the edit through the whole video: it finds where the scenes change and builds
 the picked look again for each scene, fading from one to the next. The user's
-own adjustments stay as they made them on every frame.
+own adjustments stay as they made them on every frame, and they can change
+the edit at any keyframe as well
+([Adjust at a keyframe](#3-adjust-at-a-keyframe)).
 
 ### 1. Open the video
 
@@ -1032,8 +1048,9 @@ struct Scrubber: View {
   playing or paused. Pass `showsOriginal: true` to compare with the
   unedited video, framed as the edit is.
 - `video.revision` changes when a look has been worked out for the rest of
-  the video. Until then, `look(for:edit:)` gives the first frame's edit
-  throughout.
+  the video, and when the changes at a keyframe do. Until a look is worked
+  out, `look(for:edit:)` gives the first frame's edit throughout; see
+  [Wait for the look](#wait-for-the-look).
 - Set `maxPixelSize` to the view's size in pixels. The video is then decoded
   at about that size, which is much cheaper for a 4K video. Leave it nil to
   decode and edit at full size.
@@ -1047,7 +1064,58 @@ struct Scrubber: View {
   audio carries on; unmuting while it plays switches then. Set
   `managesAudioSession = false` to handle the session yourself.
 
-### 3. Export
+### 3. Adjust at a keyframe
+
+`video.keyframeTimes` lists the keyframes, in seconds, once `start` has found
+them. The first is always 0. Its edit is the editor's own, so adjust it
+through `EditController` as usual. At any later keyframe, store the user's
+changes in `VideoEdit`:
+
+```swift
+let suggestion = editor.appliedSuggestionID
+// What the user sees at the keyframe at `time`: the look as built for that
+// scene, with their own changes.
+let shown = video.look(for: appliedSuggestion, edit: editor.currentConfig)
+    .config(at: time).properties[.exposure] ?? 0
+
+// The user moved exposure to `newValue` (keep it within the setting's range).
+var changes = video.adjustments(at: time, for: suggestion)
+changes[.exposure, default: 0] += newValue - shown
+video.setAdjustments(changes, at: time, for: suggestion)
+```
+
+- A change is an amount added on top of the look at that keyframe. It fades
+  in from the keyframe before and out to the one after, so it doesn't jump
+  in on a cut.
+- Changes are kept separately for each look. Picking another look shows
+  that look's own changes, and picking the first again brings its changes
+  back.
+- `setAdjustments` replaces all the keyframe's changes. Settings set to 0 are
+  dropped. A time that isn't one of `keyframeTimes`, or is the first, is
+  ignored.
+- `adjustments(at:for:)` reads one keyframe's changes back, for example to
+  undo a drag. `allAdjustments(for:)` returns every keyframe's, for telling
+  one edit from another, such as for an export cache. Undo and redo for
+  these changes are up to your app.
+- Each change bumps `video.revision`, so the preview code above redraws.
+  `look(for:edit:)` and `finishedLook(for:edit:)` include the changes, so the
+  export has them too.
+
+To show the user where they are, pause the player and `scrub(to:)` the
+keyframe they picked.
+
+#### Wait for the look
+
+Right after the user picks a look, `VideoEdit` builds it for every keyframe
+in the background, which takes a moment (longer for a long video). Until it
+finishes, every keyframe shows the first frame's values, so a slider at a
+later keyframe would start from the wrong place. `video.isWorkingOut(appliedSuggestion)`
+is true until then, and also before the keyframes are found. `buildingLooks`
+is published, so a view that observes `video` updates when the build is
+done. While it's working, show progress and keep the user on the keyframe
+they're on, with the controls at later keyframes held still.
+
+### 4. Export
 
 ```swift
 let look = await video.finishedLook(for: appliedSuggestion, edit: editor.currentConfig)
