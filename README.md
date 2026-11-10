@@ -7,11 +7,11 @@
 
 **One call gives a photo the edit it needs, entirely on the device.**
 
-PhotoEditKit is a photo editing toolkit for iOS and macOS apps. It looks at a photo
-(exposure, colour cast, faces, subject, grain, scene) and suggests edits you
-can show as a picker or apply straight away. It also includes the Core Image
-pipeline that renders them and an editor model for building your own editing
-screen.
+PhotoEditKit is a photo editing toolkit for iOS and macOS apps. It analyzes each photo
+(exposure, colour cast, faces, subject placement, sensor grain, and scene type) and
+suggests tailored edits you can present in a picker or apply instantly. It also includes
+the Display P3 Core Image pipeline that renders them and an editor architecture for
+building custom editing interfaces.
 
 | Original | AI edit |
 | :---: | :---: |
@@ -20,9 +20,9 @@ screen.
 
 [More examples](#examples)
 
-To try it on a phone, [AutoEdit – Smart Photo Editor](https://apps.apple.com/sg/app/autoedit-smart-photo-editor/id6818664461) on the App Store
-is built on PhotoEditKit: pick a photo and it opens on the AI's best edit,
-with the other suggested looks one tap away.
+To see it in action on iOS, [AutoEdit – Smart Photo Editor](https://apps.apple.com/sg/app/autoedit-smart-photo-editor/id6818664461) on the App Store
+is built on PhotoEditKit: select any photo and it opens directly to the AI's top edit,
+with alternative suggestions one tap away.
 
 ```swift
 if let config = AIPostProcessingHelper.topSuggestion(for: photo, metadata: properties) {
@@ -32,33 +32,38 @@ if let config = AIPostProcessingHelper.topSuggestion(for: photo, metadata: prope
 
 ## Features
 
-- **AI edit suggestions.** Up to ten ranked looks per photo (you can set the
-  limit), each with a
-  title and a thumbnail, or a single best edit. A photo that's already good
-  gets `nil` rather than a style it didn't ask for.
-- **Corrections and styles.** Brighten, Lift Shadows, Recover Highlights,
-  Warm Up, Cool Down, Clean Up and more fix problems. Vivid, Punch, Matte,
-  Muted, Soft and others are styles, sized to each photo. [See every recipe](#the-recipes).
-- **Natural faces.** Every look keeps skin hue and saturation natural.
-- **Learns on the device.** Suggestions adapt to which looks the user picks
-  and how they adjust them, separately for each kind of photo. [How it works](#learning-from-saves).
-- **RAW aware.** Can match the camera's own rendering of a RAW and build the
-  other looks on top of it.
-- **A full editor model.** `EditController` handles loading, live previews,
-  undo/redo, crop, rotation, portrait blur and full-resolution export. You
-  build the UI; `MetalImageView` draws the live preview on the GPU.
-- **HDR kept.** Exports keep the iPhone's HDR gain map.
-- **Live Photos kept.** A Live Photo's movie is edited with the photo and
-  saved paired with it.
-- **Videos.** The AI picks looks for a video's first frame, then builds the
-  chosen look again for each scene, so a darker or warmer scene gets it as it
-  suits that scene. The user can also change the edit at any scene change.
-  A preview player shows the edit on every frame, and look changes appear on
-  the next frame. [Editing videos](#editing-videos).
-- **Style matching.** Makes one photo's tones match a reference photo.
-- **Private by design.** No network requests, no models to download, no
-  account. Safe to use in app extensions.
-- **Localized** in English, Chinese and other languages.
+- **Adaptive AI suggestions.** Delivers up to ten ranked looks per photo (configurable
+  limit) with localized titles and rendered thumbnails, or a single best edit. A
+  photo that is already well-balanced returns `nil` rather than an unrequested style.
+- **Targeted corrections and styles.** Corrective recipes (Brighten, Lift Shadows,
+  Recover Highlights, Warm Up, Cool Down, Clean Up) resolve exposure, cast, and
+  noise flaws. Stylistic recipes (Vivid, Punch, Matte, Muted, Soft) apply nuanced
+  looks dynamically calibrated to each photo. [See all recipes](#the-recipes).
+- **Skin tone preservation.** Safeguards facial skin hue and saturation across all
+  recipes, keeping skin tones natural even under aggressive color moves.
+- **On-device preference learning.** Adapts suggestions to user choices and
+  subsequent slider tweaks, clustered by photo characteristics and scene type.
+  [How it works](#learning-from-saves).
+- **RAW-aware.** Matches the camera's in-body rendering of RAW captures and layers
+  further looks on top.
+- **Complete editor architecture.** `EditController` manages image loading, GPU
+  live previews, undo/redo history, cropping, straightening, portrait depth blur,
+  and full-resolution export. You supply the UI; `MetalImageView` renders live
+  previews directly on the GPU.
+- **HDR gain map preservation.** Exports preserve the iPhone's native HDR gain map.
+- **Live Photo support.** Edits apply seamlessly across both the still image and
+  the paired video asset, keeping the Live Photo paired on export.
+- **Multi-scene video restyling.** The AI evaluates the opening frame and
+  regenerates the selected look for each subsequent scene to match ambient shifts.
+  Users can override adjustments at any detected keyframe, previewing changes in
+  real time with `VideoPreviewPlayer`. [Editing videos](#editing-videos).
+- **Tone style matching.** Matches one photo's tonal distribution to a reference
+  photo or collage average using luminance quantiles, without altering underlying
+  hue or saturation.
+- **Private by design.** Zero network requests, no remote models to download, and
+  no user tracking. Safe for app extensions and strict offline requirements.
+- **Fully localized** in English, Simplified Chinese, Traditional Chinese, Japanese,
+  and Korean.
 
 ## Contents
 
@@ -84,8 +89,9 @@ if let config = AIPostProcessingHelper.topSuggestion(for: photo, metadata: prope
 
 ## How it fits into your app
 
-PhotoEditKit does the image work. Your app supplies the photo, the screens
-and the saving. This is one editing session, call by call:
+PhotoEditKit powers the underlying engine—image analysis, Core Image rendering,
+and session state. Your app provides the source media, user interface, and
+storage persistence. Here is a typical editing session, call by call:
 
 ```mermaid
 %%{init: {"themeVariables": {"actorBkg": "#0f766e", "actorBorder": "#0f766e", "actorTextColor": "#ffffff", "actorLineColor": "#14b8a6", "labelBoxBkgColor": "#0f766e", "labelBoxBorderColor": "#0f766e", "labelTextColor": "#ffffff", "loopTextColor": "#14b8a6", "activationBkgColor": "#ccfbf1", "activationBorderColor": "#0f766e"}}}%%
@@ -136,11 +142,11 @@ sequenceDiagram
 A RAW adds two more calls to your source: `loadRawExtras` while loading and
 `developRaw` while exporting.
 
-| You build | PhotoEditKit provides |
+| Your Application Provides | PhotoEditKit Delivers |
 |---|---|
-| An [`EditSource`](#1-provide-the-photo) that loads the photo from your library or files | Loading, the AI analysis and [suggestions](#ai-suggestions) with thumbnails |
-| The [editing screen](#3-edit): picker, sliders, buttons | [`EditController`](#building-an-editor-with-editcontroller): previews, undo/redo, crop, rotation, portrait blur, and [`MetalImageView`](#drawing-the-preview-on-the-gpu-with-metalimageview) to draw the preview |
-| [Saving](#4-export-and-finish): writing the file, adding it to Photos, sharing | The full-resolution render, encoded with the [HDR gain map](#exporting-with-hdr) and metadata, and [learning](#learning-from-saves) from each save |
+| An [`EditSource`](#1-provide-the-photo) that loads image data, metadata, and optional video or depth assets | Asynchronous loading, AI scene/tone analysis, and ranked [suggestions](#ai-suggestions) with live thumbnails |
+| The [editing UI](#3-edit): preset picker, adjustment sliders, and control buttons | [`EditController`](#building-an-editor-with-editcontroller) managing session state, undo/redo, crop/straighten geometry, depth blur, and [`MetalImageView`](#drawing-the-preview-on-the-gpu-with-metalimageview) for GPU rendering |
+| [Persistence & sharing](#4-export-and-finish): saving to disk, writing to Photos, or presenting a share sheet | Full-resolution Display P3 export, [HDR gain map preservation](#exporting-with-hdr), metadata correction, and [preference learning](#learning-from-saves) |
 
 For a single automatic edit with no editing screen, skip `EditController`
 and `EditSource`: one `AIPostProcessingHelper` call and one render are enough.
@@ -163,15 +169,15 @@ Each photo on the left, and on the right the edit the AI suggested for it.
 
 - iOS 17.6 or later, or macOS 15 or later
 - Xcode with the Swift compiler this release was built with, or a newer one.
-  The framework ships a module interface, so a newer compiler can read it; an
-  older one can't.
+  The framework ships a Swift module interface (`.swiftinterface`), enabling
+  compatibility with newer compiler versions; older compilers cannot read it.
 
 ### On macOS
 
-The API is the same on both platforms; images are `PlatformImage`, which is
-`UIImage` on iOS and `NSImage` on macOS. `NSImage` applies a photo's EXIF
-orientation when it loads it, so hand it over as loaded. The examples below
-use `UIImage`; on a Mac read `NSImage` in its place.
+The API is uniform across platforms. Images use `PlatformImage` (`UIImage` on
+iOS, `NSImage` on macOS). Because `NSImage` automatically applies EXIF
+orientation upon loading, pass macOS images as loaded. Code examples below
+reference `UIImage`; substitute `NSImage` when targeting macOS.
 
 ## Installation
 
@@ -236,19 +242,20 @@ if let config = AIPostProcessingHelper.topSuggestion(for: small, metadata: prope
 }
 ```
 
-`metadata` is the photo's ImageIO properties
-(`CGImageSourceCopyPropertiesAtIndex`). It's optional, but pass it when you
-have it: the exposure values in it are how the AI tells a photo that is dark
-on purpose (a night street, a lamp-lit room) from one that came out too dark.
-Without them, more night photos get brightened.
+`metadata` represents the photo's ImageIO properties
+(`CGImageSourceCopyPropertiesAtIndex`). Although optional, passing metadata is
+strongly recommended: EXIF exposure parameters (shutter speed, aperture, ISO)
+allow the AI to distinguish intentionally dark compositions (such as night
+streets or candlelit interiors) from underexposed captures. Without EXIF data,
+low-key night scenes are more likely to be brightened.
 
-For the same photo to get the same suggestions every time, give the AI the
-original file's properties, not those of a copy. Exports, screenshots and
-images saved from a canvas usually drop the EXIF. In testing, losing it changed
-the top suggestion on about 1 photo in 7, more than any other difference.
-Above about 2048 pixels on the long edge, the photo's size makes little
-difference to `suggestions(for:)`. Smaller copies read as less grainy, so they
-can get a different list.
+To guarantee deterministic suggestions, provide properties from the original
+file rather than re-exported copies, screenshots, or canvas exports, which
+routinely strip EXIF tags. During benchmarking, missing EXIF metadata altered
+the top suggestion in approximately 1 out of 7 photos. Above ~2048 px on the
+long edge, image dimensions have negligible effect on `suggestions(for:)`.
+However, aggressively downscaled copies attenuate sensor grain, which can cause
+noise-sensitive suggestions like Clean Up to be omitted.
 
 ## Edits: `EditConfig`
 
@@ -283,23 +290,23 @@ let gentler = EditConfig(properties: properties, crop: config.crop, editRotation
 | `EditSettingType` | Range | |
 |---|---|---|
 | `.exposure` | −0.5 … 0.5 | |
-| `.brightness` | −0.5 … 0.5 | moves the midtones; black and white stay where they are |
+| `.brightness` | −0.5 … 0.5 | adjusts midtones while anchoring black and white |
 | `.contrast` | −0.5 … 0.5 | |
-| `.shadow` | −1 … 1 | positive lifts shadows |
-| `.highlight` | −1 … 0 | negative recovers highlights |
+| `.shadow` | −1 … 1 | positive values lift shadow detail |
+| `.highlight` | −1 … 0 | negative values recover clipped highlights |
 | `.saturation` | −1 … 1 | |
-| `.vibrance` | −1 … 1 | saturation that goes mostly to muted colours, spares skin, and leaves greys and already-vivid colours nearly alone |
-| `.temperature` | −1 … 1 | positive is warmer |
+| `.vibrance` | −1 … 1 | boosts muted colours while protecting skin tones, neutral grays, and already-vivid hues |
+| `.temperature` | −1 … 1 | positive is warmer, negative cooler |
 | `.tint` | −1 … 1 | positive is more magenta, negative greener |
-| `.shadowWarmth` | −1 … 1 | warms or cools the shadows only |
-| `.sharpness` | −1 … 1 | positive sharpens; negative flattens fine detail into painted patches |
+| `.shadowWarmth` | −1 … 1 | warms or cools shadows and midtones while leaving highlights alone |
+| `.sharpness` | −1 … 1 | positive sharpens; negative applies painterly smoothing |
 | `.noiseReduction` | 0 … 1 | |
 | `.vignette` | −1 … 1 | |
 | `.boostRed` `.boostOrange` `.boostYellow` `.boostGreen` `.boostCyan` `.boostBlue` `.boostPurple` `.boostMagenta` | −1 … 1 | colour mixer: saturation of one colour band |
-| `.hueRed` … `.hueMagenta` (same eight bands) | −1 … 1 | colour mixer: turns a band's colours toward its neighbours; positive goes on round the wheel (red toward orange, blue toward purple) |
+| `.hueRed` … `.hueMagenta` (same eight bands) | −1 … 1 | colour mixer: shifts hue toward adjacent color wheel neighbours (positive goes red toward orange, blue toward purple) |
 | `.luminanceRed` … `.luminanceMagenta` (same eight bands) | −1 … 1 | colour mixer: lightens or darkens a band's colours, leaving greys alone |
 | `.rotation` | −45 … 45 | degrees, straightening |
-| `.depth` | 0 … 40 | background blur ("Background Blur"); offer it only when `EditController.hasDepth` |
+| `.depth` | 0 … 40 | background aperture blur ("Background Blur"); available only when `EditController.hasDepth` |
 
 `type.getSetting()` returns an `EditSetting` with the localized name, an SF
 Symbol and the range (`minValue`, `maxValue`), which is everything you need to
@@ -320,8 +327,8 @@ editor.addConfig(saturation.getEditConfig(0.1))                  // now 0.3
 settings in display order. The colour mixer has hue, saturation and luminance
 for each of eight bands (`ColorBand`): `colorMixerSettings(.hue)` lists one
 channel, and `band.setting(.luminance)` gives one band's slider. Every
-setting is a slider: there are no hidden settings a suggestion can carry that
-your editor can't show.
+parameter is exposed as an inspectable slider: suggestions carry no hidden
+adjustments that your UI cannot display or modify.
 
 Crop is `config.crop`, a rect in normalized coordinates, where `(0, 0, 1, 1)` is
 the whole image. Quarter turns and flips are `config.editRotation` (`EditRotation`).
@@ -338,16 +345,17 @@ not crop or rotation:
 let output: CIImage = input.applyingEditConfig(config)
 ```
 
-Settings always render in the same order, whatever order they were set in:
-noise reduction (and negative sharpness's smoothing) first, then white
-balance (temperature, tint), exposure, shadows and highlights, brightness,
-contrast, shadow warmth, the colour mixer, vibrance and saturation, then
-sharpening, and the vignette last.
+Settings always render in a fixed, deterministic sequence regardless of the
+order in which properties were modified: RAW recovery, noise reduction (and
+negative sharpness's smoothing) first, then white balance (temperature, tint),
+exposure, shadows and highlights, brightness, contrast, shadow warmth, the
+colour mixer, vibrance and saturation, dark guard, then sharpening, and the
+vignette last.
 
-When you're rendering a preview that is smaller than the photo, pass
-`renderScale` (preview size ÷ full size). Sharpening and noise reduction work
-in pixels, so without it a small preview looks sharper and grainier than the
-export.
+When rendering a preview smaller than the photo, pass `renderScale` (preview
+size ÷ full size). Because sharpening and noise reduction work in pixel space,
+omitting the scale factor makes a downscaled preview look sharper and grainier
+than the export.
 
 **Full render, including crop and rotation.** Use `PostProcessingHelper`. Turn
 the vignette off in the first step and apply it last, so it is centred on the
@@ -383,14 +391,15 @@ never crops or rotates. A copy of about 512 px on the long edge is enough, and
 much faster than full resolution. A `CGImage` carries no orientation, so turn
 it upright first.
 
-This is not the same as the first of `suggestions(for:)`:
+`topSuggestion` differs from the lead item of `suggestions(for:)`:
 
-- If the look that ranks first would barely change the photo, `topSuggestion`
-  returns `nil` rather than the next look down. A good photo stays as it is
-  instead of getting a style it didn't ask for.
-- It doesn't measure grain, since a small copy hides it. Its edit never adds
-  noise reduction on that account. Use `suggestions(for:)` on the full-size
-  photo when grain matters.
+- **Relevance thresholding:** If the top-ranked recipe would barely change the
+  photo (`isTooSmall`), `topSuggestion` returns `nil` rather than falling back to
+  the next look down. A photo that is already well-balanced stays as it is instead
+  of receiving an unrequested style (such as Matte).
+- **Grain bypass:** Because a downscaled copy conceals fine grain, `topSuggestion`
+  does not evaluate sensor noise and its edit never adds noise reduction. Use
+  `suggestions(for:)` on the full-size photo when grain correction matters.
 
 ### A list of suggestions
 
@@ -403,23 +412,30 @@ for suggestion in suggestions {
 }
 ```
 
-Returns up to ten suggestions, best first; pass `maxSuggestions:` for another
-limit (at least 1; `EditController.maxSuggestions` with the controller). A
-smaller limit keeps the best of the same list, in the same order. Pass `offerOriginal: true` to let
-the list lead with an **Original** suggestion (no edit) when no look improves
-on the photo as it is; it is off by default. With `EditController`, set
-`offersOriginalSuggestion` before `processAI()`. Pass `includeThemes: true` to
-also get [themes](#themes) that suit the photo; they come after the other
-suggestions, outside the limit, with `isTheme` set, and never change which other
-suggestions are offered or their order. Off by default; with `EditController`,
-set `offersThemeSuggestions`. Pass `disabledLooks:` (a set of `AILook`, such
-as `[.trueColor]`) to leave looks out; the next best take their place. With
-`EditController`, set `disabledLooks`; `topSuggestion(for:metadata:disabledLooks:)`
-takes it too. Pass the photo at full resolution,
-which is what the grain measurement needs; its `imageOrientation` is honoured.
-It took about 0.2 s on a 12 MP photo in the simulator; budget more on older
-devices. If the calling `Task` is
-cancelled, it stops at the next stage and returns an empty array.
+Returns up to ten suggestions ranked by relevance. Customize suggestion generation
+using optional parameters:
+
+- **`maxSuggestions:`** Limits the maximum number of returned looks (minimum `1`;
+  defaults to `10`). Setting a lower limit keeps the best of the same list in the
+  same order (`EditController.maxSuggestions` with the controller).
+- **`offerOriginal: true`** Prepends an unedited **Original** suggestion (no edit)
+  whenever no look improves on the photo as it is (disabled by default). With
+  `EditController`, set `offersOriginalSuggestion` before `processAI()`.
+- **`includeThemes: true`** Appends stylized [themes](#themes) that suit the photo
+  (such as Manga, Film, or B&W) after corrections and regular styles, outside the
+  count limit, with `isTheme` set (disabled by default). Themes never alter which
+  other suggestions are offered or their order. With `EditController`, set
+  `offersThemeSuggestions`.
+- **`disabledLooks:`** Pass a set of `AILook` cases (such as `[.trueColor]`) to
+  suppress specific looks; subsequent best-ranked looks take their place. Supported
+  by `suggestions(for:)`, `EditController.disabledLooks`, and
+  `topSuggestion(for:metadata:disabledLooks:)`.
+
+Pass the photo at full resolution so the grain measurement can evaluate sensor
+noise accurately; its `imageOrientation` is honoured. Analysis takes ~0.2 s on a
+12 MP photo in the simulator (allow additional time on older devices). If the
+calling `Task` is cancelled, execution stops at the next stage and returns an
+empty array.
 
 If you develop RAW files yourself, pass the camera's embedded preview. The
 AI then offers an **Original** suggestion that matches the camera's own
@@ -432,10 +448,10 @@ AIPostProcessingHelper.suggestions(for: develop, raw: raw, metadata: properties)
 
 ### Faster first photo
 
-The first photo after launch is the slowest. The AI models have to load, and
+The first photo after launch is the slowest: the AI models have to load, and
 the GPU compiles each look's filters the first time it draws them. Call
-`prewarm()` when your app launches to do that while the user is still choosing
-a photo:
+`prewarm()` when your app launches to perform this initialization in the
+background while the user is still choosing a photo:
 
 ```swift
 @main
@@ -484,10 +500,17 @@ nothing changes until there are a few of them. A habit on food photos doesn't
 change landscapes, and a change made after one look applies only to that
 look.
 
-What is learned stays small and inside the rules. A look can move a few
-places in the list, and each slider at most 15% of its range. Limits on grain,
-skin tone, clipping and minimum edit size still apply afterwards. A look's
-direction never flips: Cool Down can become neutral, but never warm.
+**Strict bounds and safety guardrails:**
+Learned adjustments are deliberately bounded to preserve visual quality:
+- **Ranking changes:** A preferred look can advance only a few positions in the
+  suggestion list (up to ±25 score points).
+- **Adjustment limits:** Parameter values adapt by at most 15% of each slider's
+  total range.
+- **Preserved guardrails:** Downstream rules for skin tones, sensor grain,
+  shadow/highlight clipping, and minimum perceptible adjustments remain strictly
+  enforced.
+- **Fixed creative intent:** A recipe's polarity never inverts (for example,
+  *Cool Down* can relax toward neutral, but will never shift warm).
 
 The records are used by `suggestions(for:)` and `topSuggestion(for:)`. Only
 `renderForExport` adds them, so an app that uses just the `AIPostProcessingHelper`
@@ -502,10 +525,11 @@ Consider offering the reset in your settings screen.
 
 ## The recipes
 
-Each suggestion comes from one of a fixed set of recipes. The AI uses only
-the recipes that suit the photo, sizes each one to it, and puts the one the
-photo most needs first. The same recipe can come out differently on two photos: Vivid on a
-landscape leans into its greens, Vivid on a street at night into its lights.
+Each suggestion comes from a fixed set of recipes. The AI selects only the
+recipes appropriate for the image, calibrates each parameter's intensity to match
+the photo's characteristics, and ranks the most impactful edit first. The same
+recipe adapts dynamically across different scenes: Vivid on a landscape leans
+into foliage greens, while Vivid on a night street intensifies neon lights.
 
 There are two kinds. **Corrections** fix something about the photo: its
 exposure, its colour or its noise. **Styles** are a matter of taste. When a
@@ -524,7 +548,7 @@ photo needs fixing, corrections come first.
 | Lift Shadows | Opens up dark areas without brightening the rest of the photo, including a subject that's dark against a bright sky or window, such as a hand held up against a sunlit curtain. |
 | Warm Up | Takes a blue or cold colour cast back to neutral. |
 | Cool Down | Takes an orange or yellow colour cast back to neutral. |
-| True Color | For daylight photos where people and buildings in shade have turned blue and milky under a bright sky. Warms the shade and restores its contrast. Also takes the edge off a strong warm cast without making the photo cold, and takes a mild green or magenta tint off the photo's whites, such as a white object that reads lavender under mixed light. A pale coloured subject, such as a lavender ice cream in focus, isn't mistaken for a tinted white, and a backlit screen or poster in the frame doesn't count against a warm cast in the room. Strong tints, and tints at night, are left alone as part of the scene. Puts back what the correction itself disturbs: warm colours keep their hue as a warm cast comes out, a warmed sky stays blue, leaves keep their light, and a face that ends up too pink, too yellow or too red is brought back to natural skin. |
+| True Color | Corrects mixed-lighting contamination while defending authentic scene colors:<br><br>• **Open-shade cast:** Warms cool, milky shadows and restores lost contrast in daylight scenes.<br>• **White neutralization:** Removes subtle green or magenta casts from white surfaces without misclassifying naturally pale subjects (such as lavender ice cream in focus).<br>• **Ambient preservation:** Retains intentional environmental light, such as warm interior lamps and night illumination.<br>• **Protective compensations:** Restores colors altered during tint extraction—sky blues stay blue, foliage maintains vibrance, and shifted skin tones are re-anchored to natural skin hues. |
 
 Warm Up and Cool Down correct a cast; they don't add one. A photo with
 balanced colour gets neither.
@@ -946,13 +970,13 @@ movie loses its HDR.
 
 ## Editing videos
 
-A video is edited through its first frame. `EditController` offers the looks
-for that frame and the user adjusts it like a photo. `VideoEdit` then carries
-the edit through the whole video: it finds where the scenes change and builds
-the picked look again for each scene, fading from one to the next. The user's
-own adjustments stay as they made them on every frame, and they can change
-the edit at any keyframe as well
-([Adjust at a keyframe](#3-adjust-at-a-keyframe)).
+Videos are edited using the opening frame as an initial reference. `EditController`
+analyzes that frame and presents tailored looks, allowing users to make
+adjustments with standard photo editing controls. `VideoEdit` then propagates the
+aesthetic across the entire video: it detects scene boundaries, re-evaluates the
+chosen look for each scene's lighting, and smoothly interpolates from one scene to
+the next. Custom slider adjustments are preserved across all frames, with support
+for keyframe-specific overrides ([Adjust at a keyframe](#3-adjust-at-a-keyframe)).
 
 ### 1. Open the video
 
@@ -1106,14 +1130,14 @@ keyframe they picked.
 
 #### Wait for the look
 
-Right after the user picks a look, `VideoEdit` builds it for every keyframe
+Immediately after the user picks a look, `VideoEdit` builds it for every keyframe
 in the background, which takes a moment (longer for a long video). Until it
-finishes, every keyframe shows the first frame's values, so a slider at a
-later keyframe would start from the wrong place. `video.isWorkingOut(appliedSuggestion)`
-is true until then, and also before the keyframes are found. `buildingLooks`
-is published, so a view that observes `video` updates when the build is
-done. While it's working, show progress and keep the user on the keyframe
-they're on, with the controls at later keyframes held still.
+finishes, every keyframe shows the first frame's values, so a slider at a later
+keyframe would start from the wrong place. `video.isWorkingOut(appliedSuggestion)`
+is true until then, and also before the keyframes are found. `buildingLooks` is
+published, so a view that observes `video` updates when the build is done. While
+it's working, show progress and keep the user on the keyframe they're on, with the
+controls at later keyframes held still.
 
 ### 4. Export
 
