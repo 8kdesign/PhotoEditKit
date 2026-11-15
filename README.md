@@ -37,8 +37,9 @@ if let config = AIPostProcessingHelper.topSuggestion(for: photo, metadata: prope
   photo that is already well-balanced returns `nil` rather than an unrequested style.
 - **Targeted corrections and styles.** Corrective recipes (Brighten, Lift Shadows,
   Recover Highlights, Warm Up, Cool Down, Clean Up) resolve exposure, cast, and
-  noise flaws. Stylistic recipes (Vivid, Punch, Matte, Muted, Soft) apply nuanced
-  looks dynamically calibrated to each photo. [See all recipes](#the-recipes).
+  noise flaws. Stylistic recipes (Vivid, Punch, Muted, Soft) apply nuanced
+  looks dynamically calibrated to each photo, and opt-in themes (Manga, B&W,
+  Film, Matte) restyle it. [See all recipes](#the-recipes).
 - **Skin tone preservation.** Safeguards facial skin hue and saturation across all
   recipes, keeping skin tones natural even under aggressive color moves.
 - **On-device preference learning.** Adapts suggestions to user choices and
@@ -396,7 +397,7 @@ it upright first.
 - **Relevance thresholding:** If the top-ranked recipe would barely change the
   photo (`isTooSmall`), `topSuggestion` returns `nil` rather than falling back to
   the next look down. A photo that is already well-balanced stays as it is instead
-  of receiving an unrequested style (such as Matte).
+  of receiving an unrequested style (such as Soft).
 - **Grain bypass:** Because a downscaled copy conceals fine grain, `topSuggestion`
   does not evaluate sensor noise and its edit never adds noise reduction. Use
   `suggestions(for:)` on the full-size photo when grain correction matters.
@@ -422,7 +423,7 @@ using optional parameters:
   whenever no look improves on the photo as it is (disabled by default). With
   `EditController`, set `offersOriginalSuggestion` before `processAI()`.
 - **`includeThemes: true`** Appends stylized [themes](#themes) that suit the photo
-  (such as Manga, Film, or B&W) after corrections and regular styles, outside the
+  (Manga, B&W, Film or Matte) after corrections and regular styles, outside the
   count limit, with `isTheme` set (disabled by default). Themes never alter which
   other suggestions are offered or their order. With `EditController`, set
   `offersThemeSuggestions`.
@@ -562,8 +563,7 @@ balanced colour gets neither.
 | Pop | Brighter and punchier at once, for a light-coloured subject in a dim room, such as a glass of juice under a lamp. The subject's own colours are lifted further than the rest of the photo. Not offered on photos with a lot of white. |
 | Vivid | Richer, more saturated colour, led by the colours the photo is about. Uses vibrance for much of it, so muted colours gain the most while skin and colours that are already strong are left nearly as they were; on photos of people it uses vibrance alone. Deepens a daylight blue sky rather than oversaturating it, and turns the yellowish greens of sunlit leaves toward true green. |
 | Muted | Quieter colour overall, while the main subject keeps its own. Takes out more colour the more colourful the photo is. |
-| Matte | A faded, film-print style: softened blacks, gentler colour and a light vignette. Fades more on a contrasty photo, less on a flat one. |
-| Soft | A gentle, warm finish with low contrast. |
+| Soft | A gentle finish: low contrast and open shadows. Leaves colour alone. |
 | Spotlight | Darkens the edges to draw the eye to the middle of the photo. Leaves colour alone. |
 
 ### Themes
@@ -576,6 +576,7 @@ offered with `includeThemes: true`, always after the corrections and styles.
 | Manga | A hand-painted anime look: bright, open shadows, soft highlights, light cyan anime skies and clean leaf greens, and fine detail flattened into painted patches (negative `.sharpness`). The sky turns less cyan when hazy blue mountains or water share its colour. City, nature and sky photos in daylight only, not sunsets or night. |
 | B&W | Black and white, with contrast, highlights and shadows set for the photo; a warm sunset sky is darkened as a blue filter does on film, through the colour mixer's luminance. Only offered on photos with strong contrast, or a city lit up at night. |
 | Film | A print from colour negative film: muted colour (greens most of all, turned toward olive, and blues toward teal), strong contrast that follows the photo's own light, highlights rolled off, a little warmth and green tint, and a very subtle vignette. Slightly darker than the photo, but eases off on faces and on a subject that is already dark. Not offered on night or dark photos. |
+| Matte | A faded print: softened blacks, gentler colour and a light vignette. Fades more on a contrasty photo, less on a flat one, and lifts deep blacks less. Not offered at night or in a dim room, on a photo with a strong warm cast, or on food. |
 
 ### Every recipe
 
