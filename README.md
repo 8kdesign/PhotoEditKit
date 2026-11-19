@@ -7,6 +7,8 @@
 
 **One call gives a photo the edit it needs, entirely on the device.**
 
+Website: **[photoeditkit.org](https://www.photoeditkit.org/)**, with before/after examples of every recipe.
+
 PhotoEditKit is a photo editing toolkit for iOS and macOS apps. It analyzes each photo
 (exposure, colour cast, faces, subject placement, sensor grain, and scene type) and
 suggests tailored edits you can present in a picker or apply instantly. It also includes
