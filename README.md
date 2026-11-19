@@ -293,6 +293,7 @@ let gentler = EditConfig(properties: properties, crop: config.crop, editRotation
 | `.exposure` | −0.5 … 0.5 | |
 | `.brightness` | −0.5 … 0.5 | adjusts midtones while anchoring black and white |
 | `.contrast` | −0.5 … 0.5 | |
+| `.blackPoint` | −1 … 1 | positive takes milky blacks to black and keeps the highlights; negative lifts black to a faded grey |
 | `.shadow` | −1 … 1 | positive values lift shadow detail |
 | `.highlight` | −1 … 0 | negative values recover clipped highlights |
 | `.saturation` | −1 … 1 | |
@@ -350,8 +351,8 @@ Settings always render in a fixed, deterministic sequence regardless of the
 order in which properties were modified: RAW recovery, noise reduction (and
 negative sharpness's smoothing) first, then white balance (temperature, tint),
 exposure, shadows and highlights, brightness, contrast, shadow warmth, the
-colour mixer, vibrance and saturation, dark guard, then sharpening, and the
-vignette last.
+colour mixer, vibrance and saturation, dark guard, black point, then
+sharpening, and the vignette last.
 
 When rendering a preview smaller than the photo, pass `renderScale` (preview
 size ÷ full size). Because sharpening and noise reduction work in pixel space,
