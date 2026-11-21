@@ -38,8 +38,8 @@ if let config = AIPostProcessingHelper.topSuggestion(for: photo, metadata: prope
   limit) with localized titles and rendered thumbnails, or a single best edit. A
   photo that is already well-balanced returns `nil` rather than an unrequested style.
 - **Targeted corrections and styles.** Corrective recipes (Brighten, Lift Shadows,
-  Recover Highlights, Warm Up, Cool Down, Clean Up) resolve exposure, cast, and
-  noise flaws. Stylistic recipes (Vivid, Punch, Muted, Soft) apply nuanced
+  Recover Highlights, Warm Up, Cool Down, Clean Up) resolve exposure, cast,
+  noise and soft-face flaws. Stylistic recipes (Vivid, Punch, Muted, Soft) apply nuanced
   looks dynamically calibrated to each photo, and opt-in themes (Manga, B&W,
   Film, Matte) restyle it. [See all recipes](#the-recipes).
 - **Skin tone preservation.** Safeguards facial skin hue and saturation across all
@@ -257,8 +257,10 @@ file rather than re-exported copies, screenshots, or canvas exports, which
 routinely strip EXIF tags. During benchmarking, missing EXIF metadata altered
 the top suggestion in approximately 1 out of 7 photos. Above ~2048 px on the
 long edge, image dimensions have negligible effect on `suggestions(for:)`.
-However, aggressively downscaled copies attenuate sensor grain, which can cause
-noise-sensitive suggestions like Clean Up to be omitted.
+However, downscaled or recompressed copies change what Clean Up reads: JPEG
+copies can show grain the original didn't have, and on a small copy a face may
+be too small to judge for sharpening. So Clean Up can appear or disappear
+compared with the original.
 
 ## Edits: `EditConfig`
 
@@ -544,7 +546,7 @@ photo needs fixing, corrections come first.
 | Recipe | What it does |
 |---|---|
 | Original | RAW photos only. Matches the camera's own rendering of the RAW, which is usually livelier than a plain develop. Every other recipe on a RAW starts from it. |
-| Clean Up | Reduces grain and noise, and leaves tone and colour alone. |
+| Clean Up | Fixes the photo's quality rather than its look: reduces grain on a dark photo at night or one that is clearly overexposed, and sharpens a main face that reads soft. It doesn't set out to change tone or colour, though the skin guard may nudge a face. |
 | Balance Light | RAW photos only. Opens up the shadows and brings back the highlights together, for backlit or high-contrast scenes. |
 | Brighten | Lifts a photo that came out too dark. The subject's own colours are lifted a little further than the rest, through the colour mixer's luminance. |
 | Deepen | The opposite of Brighten: richer blacks and more contrast for a photo that looks grey or washed out, without lightening it. |
@@ -587,7 +589,8 @@ offered with `includeThemes: true`, always after the corrections and styles.
   natural hue and saturation, and faces are brightened slightly without
   brightening the rest of the photo. A face lit by coloured light from
   different sides, as on a stage, is left as lit. A clearly blurred face near the middle of the
-  frame is sharpened slightly (except in Clean Up and Soft); no other
+  frame is sharpened slightly (Clean Up sharpens it more firmly itself; Soft
+  leaves it); no other
   sharpening is added unless the photo itself measures soft (Crisp). Faces
   smaller than about 2% of the frame count for less.
 - **Subject and focus:** the AI works out where the subject is from faces,
