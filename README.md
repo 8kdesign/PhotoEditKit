@@ -41,7 +41,7 @@ if let config = AIPostProcessingHelper.topSuggestion(for: photo, metadata: prope
   Recover Highlights, Warm Up, Cool Down, Clean Up) resolve exposure, cast,
   noise and soft-face flaws. Stylistic recipes (Vivid, Punch, Muted, Soft) apply nuanced
   looks dynamically calibrated to each photo, and opt-in themes (Manga, B&W,
-  Film, Matte) restyle it. [See all recipes](#the-recipes).
+  Film, Matte, Digicam) restyle it. [See all recipes](#the-recipes).
 - **Skin tone preservation.** Safeguards facial skin hue and saturation across all
   recipes, keeping skin tones natural even under aggressive color moves.
 - **On-device preference learning.** Adapts suggestions to user choices and
@@ -60,6 +60,10 @@ if let config = AIPostProcessingHelper.topSuggestion(for: photo, metadata: prope
   regenerates the selected look for each subsequent scene to match ambient shifts.
   Users can override adjustments at any detected keyframe, previewing changes in
   real time with `VideoPreviewPlayer`. [Editing videos](#editing-videos).
+- **Editing by conversation.** With Apple Intelligence, `EditAgent` turns plain
+  requests ("a bit warmer", "make it moody", "亮一点") into an edit, checks the
+  result and corrects it, and shows a before/after the user sets or not.
+  [Apple Intelligence](#editing-by-conversation-with-apple-intelligence).
 - **Tone style matching.** Matches one photo's tonal distribution to a reference
   photo or collage average using luminance quantiles, without altering underlying
   hue or saturation.
@@ -84,6 +88,7 @@ if let config = AIPostProcessingHelper.topSuggestion(for: photo, metadata: prope
 - [Keeping Live Photos live](#keeping-live-photos-live)
 - [Editing videos](#editing-videos)
 - [Matching a style](#matching-a-style)
+- [Editing by conversation with Apple Intelligence](#editing-by-conversation-with-apple-intelligence)
 - [Threading](#threading)
 - [Localization](#localization)
 - [Privacy](#privacy)
@@ -171,6 +176,10 @@ Each photo on the left, and on the right the edit the AI suggested for it.
 ## Requirements
 
 - iOS 17.6 or later, or macOS 15 or later
+- For [editing by conversation](#editing-by-conversation-with-apple-intelligence):
+  iOS 26 or macOS 26, on a device with Apple Intelligence turned on. The
+  framework links Apple's FoundationModels weakly, so it still loads on
+  earlier systems.
 - Xcode with the Swift compiler this release was built with, or a newer one.
   The framework ships a Swift module interface (`.swiftinterface`), enabling
   compatibility with newer compiler versions; older compilers cannot read it.
@@ -299,14 +308,16 @@ let gentler = EditConfig(properties: properties, crop: config.crop, editRotation
 | `.contrast` | −0.5 … 0.5 | |
 | `.blackPoint` | −1 … 1 | positive takes milky blacks to black and keeps the highlights; negative lifts black to a faded grey |
 | `.shadow` | −1 … 1 | positive values lift shadow detail |
-| `.highlight` | −1 … 0 | negative values recover clipped highlights |
+| `.highlight` | −1 … 1 | negative values recover clipped highlights; positive values push highlights up and clip them hard at white, one colour channel at a time, like an old camera sensor (a sky turns cyan before white, and no HDR headroom is kept) |
 | `.saturation` | −1 … 1 | |
 | `.vibrance` | −1 … 1 | boosts muted colours while protecting skin tones, neutral grays, and already-vivid hues |
 | `.temperature` | −1 … 1 | positive is warmer, negative cooler |
 | `.tint` | −1 … 1 | positive is more magenta, negative greener |
 | `.shadowWarmth` | −1 … 1 | warms or cools shadows and midtones while leaving highlights alone |
 | `.sharpness` | −1 … 1 | positive sharpens; negative applies painterly smoothing |
+| `.lofi` | 0 … 1 | "Lo-Fi": the softness of an old low-resolution camera: the whole photo resolves at a fixed size whatever its own, from 6,000 px on the long edge as the slider leaves 0 down to 480 px (VGA) at 1; about 800 px (0.5 MP) at 0.8. The small frame also goes through a real JPEG save (quality 0.9 down to 0.4 at 1), so its blocks, ringing and colour bleeding are enlarged with it. Sized to the frame, so previews and saves match, and a render already smaller than that is left as it is |
 | `.noiseReduction` | 0 … 1 | |
+| `.noise` | 0 … 1 | adds an old small sensor's noise: fine speckle and coarser colour blotches, mostly in the shadows; not applied to Live Photo movies |
 | `.vignette` | −1 … 1 | |
 | `.boostRed` `.boostOrange` `.boostYellow` `.boostGreen` `.boostCyan` `.boostBlue` `.boostPurple` `.boostMagenta` | −1 … 1 | colour mixer: saturation of one colour band |
 | `.hueRed` … `.hueMagenta` (same eight bands) | −1 … 1 | colour mixer: shifts hue toward adjacent color wheel neighbours (positive goes red toward orange, blue toward purple) |
@@ -427,8 +438,10 @@ using optional parameters:
 - **`offerOriginal: true`** Prepends an unedited **Original** suggestion (no edit)
   whenever no look improves on the photo as it is (disabled by default). With
   `EditController`, set `offersOriginalSuggestion` before `processAI()`.
+  Without it, Original is still returned on its own when no look is worth
+  offering at all, so the list is never empty.
 - **`includeThemes: true`** Appends stylized [themes](#themes) that suit the photo
-  (Manga, B&W, Film or Matte) after corrections and regular styles, outside the
+  (Manga, B&W, Film, Matte or Digicam) after corrections and regular styles, outside the
   count limit, with `isTheme` set (disabled by default). Themes never alter which
   other suggestions are offered or their order. With `EditController`, set
   `offersThemeSuggestions`.
@@ -441,7 +454,7 @@ Pass the photo at full resolution so the grain measurement can evaluate sensor
 noise accurately; its `imageOrientation` is honoured. Analysis takes ~0.2 s on a
 12 MP photo in the simulator (allow additional time on older devices). If the
 calling `Task` is cancelled, execution stops at the next stage and returns an
-empty array.
+empty array; otherwise the list always holds at least one suggestion.
 
 If you develop RAW files yourself, pass the camera's embedded preview. The
 AI then offers an **Original** suggestion that matches the camera's own
@@ -582,6 +595,7 @@ offered with `includeThemes: true`, always after the corrections and styles.
 | B&W | Black and white, with contrast, highlights and shadows set for the photo; a warm sunset sky is darkened as a blue filter does on film, through the colour mixer's luminance. Only offered on photos with strong contrast, or a city lit up at night. |
 | Film | A print from colour negative film: muted colour (greens most of all, turned toward olive, and blues toward teal), strong contrast that follows the photo's own light, highlights rolled off, a little warmth and green tint, and a very subtle vignette. Slightly darker than the photo, but eases off on faces and on a subject that is already dark. Not offered on night or dark photos. |
 | Matte | A faded print: softened blacks, gentler colour and a light vignette. Fades more on a contrasty photo, less on a flat one, and lifts deep blacks less. Not offered at night or in a dim room, on a photo with a strong warm cast, or on food. |
+| Digicam | An early-2000s point-and-shoot: overexposed, more on brighter photos up to a point (at most about +0.2 exposure, and none on photos already bright), with highlights clipped hard to white the way a small sensor clipped them (`.highlight` +0.5), so a sky turns cyan and skin yellowish on the way to white, flat midtones with greyish, muddy blacks, a cool blue-cyan cast (coolest in the shade), thin colour apart from cyan-blue skies, a low-resolution softness (`.lofi`) with fine detail lightly smeared (slightly negative `.sharpness`), colour sensor noise (`.noise`), more on dim photos, and a light vignette on bright photos or a dark one on dark photos. Blacks are always lifted to a grey, most on dark and night photos, eased only on dark skin. Offered on any photo, dark and night ones included, but not for videos. |
 
 ### Every recipe
 
@@ -1001,12 +1015,13 @@ video.start { [weak self] in self?.appliedSuggestion }
 ```
 
 `VideoEditSource` reads the movie where it is and never deletes it; use a
-file you keep for the whole session. `configureForVideo()` leaves sharpening
-and noise reduction out (each frame would be changed differently and the
-video would shimmer), drops the looks built on them (Crisp, Manga and
+file you keep for the whole session. `configureForVideo()` leaves sharpening,
+noise reduction and added noise out (each frame would be changed differently
+and the video would shimmer; added noise would sit still over the moving
+picture), drops the looks built on them (Crisp, Manga and
 Clean Up), and has the AI read the frame for how dim the scene was, since a
-video frame has no exposure metadata. Hide the sharpening and noise reduction
-controls too: `VideoLook.excludedSettings` lists them.
+video frame has no exposure metadata. Hide the sharpening, noise reduction and
+Noise controls too: `VideoLook.excludedSettings` lists them.
 
 `start` reads the whole video once in the background to find the scene
 changes. The closure returns the suggestion applied when that finishes. Here
@@ -1188,6 +1203,133 @@ let matched = photo.applyingStyleTransform(transform)
 
 Use `StyleMatcher.average(of:)` to combine several references into one.
 
+## Editing by conversation with Apple Intelligence
+
+`EditAgent` lets the user edit by asking: "a bit warmer", "the sky is too
+bright", "make it moody", "use the vivid look", "too much". It answers with a
+short reply and a proposal: the photo as it is now beside the edited version.
+Nothing changes on the photo until the user sets a proposal, so a
+conversation can try several things and go back.
+
+It runs on Apple's on-device language model (FoundationModels). PhotoEditKit
+doesn't bundle or download a model, and no photo or request leaves the device.
+
+### Check availability
+
+```swift
+import PhotoEditKit
+
+guard #available(iOS 26.0, macOS 26.0, *) else { return }   // hide the feature
+if case .unavailable(let reason) = EditAgent.availability {
+    showToast(reason)   // e.g. "Turn on Apple Intelligence", localized
+    return
+}
+```
+
+`availability` is `.unavailable` when the device doesn't support Apple
+Intelligence, it is turned off, or the model is still downloading. Read it
+each time the user opens the feature: the model can finish downloading
+while your app runs.
+
+### Hold a conversation
+
+```swift
+// One agent per conversation, on the editor the user is working in.
+let agent = EditAgent(editor: editor)
+agent.prepare()   // starts looking at the photo while the user types
+
+let reply = await agent.respond(to: "a bit warmer")
+showMessage(reply.text)                 // in the request's language
+if let proposal = reply.proposal {
+    showComparison(before: proposal.before, after: proposal.main.after)
+    // proposal.options: one, or subtle / medium / strong for a style
+    // proposal.fixes, proposal.warnings: see "What it checks" below
+}
+```
+
+Requests build on each other, so "more", "too much", "undo that" and
+"actually, warmer instead" refer to the last answer. `respond` returns once the
+proposal's images are rendered, usually within a few seconds. Disable your
+send button while `isResponding` is true; a second request meanwhile is
+ignored.
+
+When the user picks an option:
+
+```swift
+agent.set(proposal, option: chosen)   // chosen: one of proposal.options
+```
+
+`set` puts the proposal's look on first, if it has one, then the slider
+changes as one undo step. Pass `applyLook:` if your app applies looks its own
+way, for example to keep its own undo history. `isSet(_:)` tells you whether
+the photo already shows an option, for a "Set" button's state.
+
+If the user edits the photo some other way while the conversation is hidden,
+call `syncWithEditor()` when you show it again: the next request then starts
+from the photo as it is.
+
+When the conversation closes, cancel the task awaiting `respond` and call
+`cancel()`. Both stop within a few hundredths of a second, rendering and model
+work included.
+
+```swift
+requestTask?.cancel()
+agent.cancel()
+```
+
+### What it understands
+
+| Kind of request | Examples | What happens |
+|---|---|---|
+| Light and colour | "brighter", "less contrast", "less blue", "it looks too green" | The setting, with the others it needs to look right |
+| Parts of the photo | "open up the shadows", "bring back the bright areas", "deeper blue sky", "richer greens" | Shadows, highlights, or the sky's or leaves' colours |
+| How far | "a bit warmer", "much darker" | A smaller or larger step |
+| Styles | "moody", "dramatic", "dreamy", "airy", "softer", "vintage" | A fixed recipe per style, offered subtle, medium and strong |
+| Looks | "use the vivid look", "apply True Color" | That [recipe](#the-recipes), as built for this photo |
+| Fixes | "make it better", "fix the colours" | The AI's top suggestion, or its white-balance fix |
+| Black and white | "make it black and white" | All colour taken out |
+| Follow-ups | "more", "too much", "undo that" | The last change, repeated, halved or taken back |
+| Questions | "what's wrong with this photo?" | An answer and no edit |
+| Other tools | "crop it", "remove the person" | A short reply saying it can't |
+
+Common phrasings in English and Chinese are read directly, so the same request
+always gives the same edit. The model plans anything else, and writes every
+reply.
+
+### What it checks
+
+The agent measures each try on a small render and corrects it until the photo
+has moved as far as asked, at most `maxReviews` times. It judges the subject
+more than the background, and on a dark photo the lit parts more than the
+black around them.
+
+It also scores each result with the same rules that rank the
+[AI suggestions](#ai-suggestions), and compares that with the photo as set:
+
+- `proposal.fixes`: problems the edit fixes, such as "too dark" or
+  "colour cast".
+- `proposal.warnings`: problems the edit causes that the photo didn't have,
+  such as "blown highlights". Show these as a caution; the user decides.
+
+Both are localized and empty when there's nothing to say. A problem the
+request asks for doesn't count as a warning: darker is meant to be darker.
+
+When an edit would cause a problem, the agent first tries to avoid it. It
+brightens a photo with a bright sky through the midtones rather than exposure,
+and it holds brightness steady while it changes contrast or colour. When that
+isn't enough, it takes back half the step.
+
+### Limits
+
+- Light and colour only. Cropping, rotating and removing things are for other
+  tools; the agent says so.
+- Phrasings outside the built-in table depend on the on-device model, so
+  they can be answered differently on different tries.
+- The first request on iOS 27 or macOS 27 also has the model look at the
+  photo, which adds a few seconds. `prepare()` starts that early.
+- Apple Intelligence isn't offered in every region, language or device. Check
+  `availability` rather than assuming it.
+
 ## Threading
 
 Calls are marked with the actor they run on, and can be awaited from anywhere:
@@ -1200,6 +1342,9 @@ Calls are marked with the actor they run on, and can be awaited from anywhere:
   `VideoPreviewPlayer`. `exportVideo` runs on `LogicActor`.
 
 `EditController` runs its AI suggestions on a background actor of its own.
+
+`EditAgent` is `MainActor`. It renders on `LogicActor` and calls the model off
+the main thread, so awaiting `respond` doesn't block your UI.
 
 `AIPostProcessingHelper` and `applyingEditConfig` aren't tied to an actor. Call
 them from wherever suits you, just not on the main thread for full-size images.
@@ -1232,6 +1377,13 @@ summary numbers, look names and slider values for at most the 500 latest
 saves (under 0.5 MB). It is included in device backups like the rest of your
 app's data. It is deleted with your app, or straight away by
 `resetLearnedPreferences()`.
+
+[Editing by conversation](#editing-by-conversation-with-apple-intelligence)
+runs on Apple's on-device model; requests and photos stay on the device. It
+writes one small file, `Library/Application Support/PhotoEditKit/AgentPreferences.json`,
+holding how far this user likes each kind of change to go (one number per
+setting, learned from "more", "too much" and the strength they set). It holds no
+requests or photos.
 
 ## Support
 
